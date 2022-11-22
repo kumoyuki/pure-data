@@ -45,7 +45,9 @@ int main(int argc, char **argv)
             else continue;
         }
         happy = 0;
+/*
         kill(getppid(), SIGHUP);
         fprintf(stderr, "watchdog: signaling pd...\n");
+*/
     }
 }
