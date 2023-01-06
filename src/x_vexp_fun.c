@@ -122,6 +122,7 @@ struct ex_ex * ex_if(t_expr *expr, struct ex_ex *argv, struct ex_ex *optr,
                                      struct ex_ex *args, int idx);
 static void ex_ldexp(t_expr *expr, long argc, struct ex_ex *argv, struct ex_ex *optr);
 static void ex_imodf(t_expr *expr, long argc, struct ex_ex *argv, struct ex_ex *optr);
+static void ex_modulo(t_expr *expr, long argc, struct ex_ex *argv, struct ex_ex *optr);
 static void ex_modf(t_expr *expr, long argc, struct ex_ex *argv, struct ex_ex *optr);
 static void ex_mtof(t_expr *expr, long argc, struct ex_ex *argv, struct ex_ex *optr);
 static void ex_ftom(t_expr *expr, long argc, struct ex_ex *argv, struct ex_ex *optr);
@@ -184,6 +185,7 @@ t_ex_func ex_funcs[] = {
         {"ldexp",       ex_ldexp,       2},
         {"imodf",       ex_imodf,       1},
         {"modf",        ex_modf,        1},
+        {"mod",         ex_modulo,      2},     /* number theoretic modulo */
 		{"mtof",		ex_mtof,		1},
 		{"ftom",		ex_ftom,		1},
 		{"dbtorms",		ex_dbtorms,		1},
@@ -1284,7 +1286,20 @@ fracmodf(double x)
 }
 FUNC_DEF_UNARY(ex_modf, fracmodf, (double), 1);
 
+static double
+modulo(double _x, double _modulus)
+{
+    long long int modulus = _modulus;
+    long long int x = _x;
+    if(modulus == 0)
+        return x;
 
+    long long int r = x % modulus;
+    if(r < 0) r += modulus;
+    return r;
+}
+
+FUNC_DEF(ex_modulo, modulo, (double), (double), 1);
 FUNC_DEF_UNARY(ex_mtof, mtof, (double), 1);
 FUNC_DEF_UNARY(ex_ftom, ftom, (double), 1);
 FUNC_DEF_UNARY(ex_dbtorms, dbtorms, (double), 1);
