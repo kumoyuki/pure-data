@@ -1024,7 +1024,6 @@ static void poly_float(t_poly *x, t_float f)
     t_voice *v;
     t_voice *firston, *firstoff;
     unsigned int serialon, serialoff, onindex = 0, offindex = 0;
-    fprintf(stderr, "poly_float: note %g, vel %g\n", f, x->x_vel);
     
     if (x->x_vel > 0)
     {
@@ -1039,7 +1038,6 @@ static void poly_float(t_poly *x, t_float f)
         }
         if (firstoff)
         {
-            fprintf(stderr, "got voice %d, pitch %g, vel %g\n", offindex+1, f, x->x_vel);
             outlet_float(x->x_velout, x->x_vel);
             outlet_float(x->x_pitchout, firstoff->v_pitch = f);
             outlet_float(x->x_obj.ob_outlet, offindex+1);
@@ -1049,8 +1047,6 @@ static void poly_float(t_poly *x, t_float f)
             /* if none, steal one */
         else if (firston && x->x_steal)
         {
-            fprintf(stderr, "stealing voice %d, was pitch %g\n",
-                    onindex+1, firston->v_pitch);
             outlet_float(x->x_velout, 0);
             outlet_float(x->x_pitchout, firston->v_pitch);
             outlet_float(x->x_obj.ob_outlet, onindex+1);
@@ -1068,8 +1064,6 @@ static void poly_float(t_poly *x, t_float f)
             t_voice* v = &x->x_vec[i];
             if (v->v_used && v->v_pitch == f && v->v_serial < serialon)
             {
-                fprintf(stderr, "just passing through %d, pitch %g, vel %g\n",
-                        i+1, f, x->x_vel);
                 outlet_float(x->x_velout, x->x_vel);
                 outlet_float(x->x_pitchout, v->v_pitch);
                 outlet_float(x->x_obj.ob_outlet, i+1);
@@ -1085,8 +1079,6 @@ static void poly_float(t_poly *x, t_float f)
                     firston = v, serialon = (unsigned int)v->v_serial, onindex = i;
         if (firston)
         {
-            fprintf(stderr, "turning off voice %d, pitch %g\n",
-                    onindex+1, firston->v_pitch);
             firston->v_used = 0;
             firston->v_serial = x->x_serial++;
             outlet_float(x->x_velout, 0);
