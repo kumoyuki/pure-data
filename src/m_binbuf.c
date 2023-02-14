@@ -612,6 +612,13 @@ done:
 
 void binbuf_eval(const t_binbuf *x, t_pd *target, int argc, const t_atom *argv)
 {
+#if defined(CHASING_BINBUF)
+    char *bugs = NULL;
+    int bugl = 0;
+    binbuf_gettext(x, &bugs, &bugl);
+    fprintf(stdout, "binbuf_eval: %s\n", bugs);
+#endif
+    
     t_atom smallstack[SMALLMSG], *mstack, *msp;
     const t_atom *at = x->b_vec;
     int ac = x->b_n;
