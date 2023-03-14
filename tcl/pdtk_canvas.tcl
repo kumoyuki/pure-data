@@ -103,6 +103,7 @@ proc pdtk_canvas_new {mytoplevel width height geometry editable} {
         set ::pdtk_canvas::geometry_needs_init($mytoplevel) 1
     }
 
+    puts stdout "pdtk_canvas_new: mytoplevel=$mytoplevel"
     foreach {width height geometry} [pdtk_canvas_place_window $width $height $geometry] {break;}
     set ::undo_actions($mytoplevel) no
     set ::redo_actions($mytoplevel) no
@@ -127,6 +128,7 @@ proc pdtk_canvas_new {mytoplevel width height geometry editable} {
     wm minsize $mytoplevel $::canvas_minwidth $::canvas_minheight
 
     set tkcanvas [tkcanvas_name $mytoplevel]
+    puts stdout "pdtk_canvas_new: tkcanvas_name=$tkcanvas"
     canvas $tkcanvas -width $width -height $height \
         -highlightthickness 0 -scrollregion [list 0 0 $width $height] \
         -xscrollcommand "$mytoplevel.xscroll set" \

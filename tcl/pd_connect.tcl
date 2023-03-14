@@ -111,6 +111,7 @@ proc ::pd_connect::pd_readsocket {} {
      }
 
     foreach {docmds cmdbuf} [assemble_cmd $cmdbuf [read $pd_socket]] { break; }
+    puts stdout "socket command $docmds"
     if { [string length $docmds] > 0 } {
          if {![catch {uplevel #0 $docmds} errorname]} {
              # we ran the command block without error, reset the buffer
