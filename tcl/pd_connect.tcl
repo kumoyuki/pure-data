@@ -59,6 +59,7 @@ proc ::pd_connect::from_pd {channel clientaddr clientport} {
 proc ::pd_connect::pdsend {message} {
     variable pd_socket
     append message \;
+    puts stdout "pdsend $message"
     if {[catch {puts $pd_socket $message} errorname]} {
         puts stderr "pdsend errorname: >>$errorname<<"
         error "not connected to 'pd' process"
