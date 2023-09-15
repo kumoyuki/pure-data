@@ -200,6 +200,7 @@ void alsa_reportidle(void);
 void alsa_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int *canmulti,
         int maxndev, int devdescsize);
+struct midi_plugin* alsamidi_get_plugin();
 
 int jack_open_audio(int inchans, int outchans, t_audiocallback callback);
 void jack_close_audio(void);

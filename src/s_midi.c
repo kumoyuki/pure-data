@@ -597,7 +597,7 @@ void sys_open_midi(int nmidiindev, int *midiindev,
 #endif
 #ifdef USEAPI_OSS
         midi_system = ossmidi_get_plugin();
-        midi_system->init();
+        midi_system->mp_init();
 #endif
 #ifdef USEAPI_ALSA
         if (sys_midiapi == API_ALSA)
@@ -652,10 +652,17 @@ void sys_set_midi_api(int which)
 {
     switch (which) {
 #ifdef USEAPI_ALSA
-    case(API_ALSA): break;
+    case(API_ALSA):
+        midi_system = alsamidi_get_plugin();
+        break;
 #endif
 #ifndef FORCEAPI_ALSA
     case(API_DEFAULTMIDI): break;
+#endif
+#ifdef USEAPI_OSS
+    case(API_OSS):
+        midi_system = ossmidi_get_plugin();
+        break;
 #endif
     default:
         logpost(NULL, PD_VERBOSE, "ignoring unknown MIDI API %d", which);
