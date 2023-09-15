@@ -10,6 +10,8 @@ in future releases.  The public (stable) API is in m_pd.h. */
 
 /* in s_path.c */
 
+struct midi_plugin;
+
 typedef struct _namelist    /* element in a linked list of stored strings */
 {
     struct _namelist *nl_next;  /* next in list */
@@ -187,6 +189,7 @@ void oss_reportidle(void);
 void oss_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int *canmulti,
         int maxndev, int devdescsize);
+struct midi_plugin* ossmidi_get_plugin();
 
 int alsa_open_audio(int naudioindev, int *audioindev, int nchindev,
     int *chindev, int naudiooutdev, int *audiooutdev, int nchoutdev,

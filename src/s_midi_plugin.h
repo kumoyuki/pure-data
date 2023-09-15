@@ -18,3 +18,4 @@ struct midi_plugin
         char *outdevlist, int *noutdevs, int maxndev, int devdescsize);
 };
 
+extern struct midi_plugin* midi_system;

@@ -254,5 +254,6 @@ struct midi_plugin* ossmidi_get_plugin() {
         oss_midi_getdevs
     };
 
+    fprintf(stderr, "getting oss midi plugin: %p\n", &oss);
     return &oss;
 }

@@ -4,8 +4,8 @@
 
 /* Clock functions (which should move, but where?) and MIDI queueing */
 
-#include "m_pd.h"
-#include "s_stuff.h"
+#include "s_midi_plugin.h"
+
 #include "m_imp.h"
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -596,6 +596,7 @@ void sys_open_midi(int nmidiindev, int *midiindev,
         midi_alsa_init();
 #endif
 #ifdef USEAPI_OSS
+        midi_system = ossmidi_get_plugin();
         midi_oss_init();
 #endif
 #ifdef USEAPI_ALSA
