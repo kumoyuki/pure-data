@@ -194,6 +194,7 @@ pd_SOURCES_core = \
 pd_SOURCES_standalone = \
     s_file.c \
     s_midi.c \
+    s_midi_plugin.c \
     $(empty)
 
 # pd-watchdog and "local" pd symlink location for tcl scripts

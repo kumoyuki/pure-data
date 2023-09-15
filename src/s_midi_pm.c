@@ -7,10 +7,8 @@
 
 */
 
-#include "m_pd.h"
-#include "s_stuff.h"
-#include "s_utf8.h"
-#include <stdio.h>
+#include "s_midi_plugin.h"
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #include <sys/time.h>
@@ -45,7 +43,7 @@ static PmStream *mac_midioutdevlist[MAXMIDIOUTDEV];
 static int mac_nmidiindev;
 static int mac_nmidioutdev;
 
-void sys_do_open_midi(int nmidiin, int *midiinvec,
+static void sys_do_open_midi(int nmidiin, int *midiinvec,
     int nmidiout, int *midioutvec)
 {
     int i = 0, j, devno;
@@ -112,7 +110,7 @@ void sys_do_open_midi(int nmidiin, int *midiinvec,
     }
 }
 
-void sys_close_midi(void)
+static void sys_close_midi(void)
 {
     int i;
     for (i = 0; i < mac_nmidiindev; i++)
@@ -123,7 +121,7 @@ void sys_close_midi(void)
     mac_nmidioutdev = 0;
 }
 
-void sys_putmidimess(int portno, int a, int b, int c)
+static void sys_putmidimess(int portno, int a, int b, int c)
 {
     PmEvent buffer;
     /* fprintf(stderr, "put 1 msg %d %d\n", portno, mac_nmidioutdev); */
@@ -146,7 +144,7 @@ static void writemidi4(PortMidiStream* stream, int a, int b, int c, int d)
 }
 
 
-void sys_putmidibyte(int portno, int byte)
+static void sys_putmidibyte(int portno, int byte)
 {
         /* try to parse the bytes into MIDI messages so they can
         fit into PortMidi buffers. */
@@ -266,7 +264,7 @@ void nd_sysex_inword(int midiindev, int status, int data1, int data2, int data3)
     }
 }
 
-void sys_poll_midi(void)
+static void sys_poll_midi(void)
 {
     int i, nmess, throttle = 100;
     PmEvent buffer;
@@ -335,7 +333,7 @@ void sys_poll_midi(void)
     overload: ;
 }
 
-void midi_getdevs(char *indevlist, int *nindevs,
+static void midi_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int maxndev, int devdescsize)
 {
     int i, nindev = 0, noutdev = 0;
@@ -361,4 +359,18 @@ void midi_getdevs(char *indevlist, int *nindevs,
     }
     *nindevs = nindev;
     *noutdevs = noutdev;
+}
+
+struct midi_plugin* portmidi_get_plugin() {
+    static struct midi_plugin pm = {
+        "portmidi",
+        sys_do_open_midi,
+        sys_close_midi,
+        sys_put_midimess,
+        sys_put_midibyte,
+        sys_poll_midi,
+        midi_getdevs
+    };
+
+    return &pm;
 }
