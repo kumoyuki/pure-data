@@ -7,7 +7,8 @@
 struct midi_plugin
 {
     char const* mp_name;
-    
+
+    void (*mp_init)();
     void (*mp_open_midi)(int nmidiin, int *midiinvec, int nmidiout, int *midioutvec);
     void (*mp_close_midi)(void);
     void (*mp_putmidimess)(int portno, int a, int b, int c);

@@ -597,7 +597,7 @@ void sys_open_midi(int nmidiindev, int *midiindev,
 #endif
 #ifdef USEAPI_OSS
         midi_system = ossmidi_get_plugin();
-        midi_oss_init();
+        midi_system->init();
 #endif
 #ifdef USEAPI_ALSA
         if (sys_midiapi == API_ALSA)

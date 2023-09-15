@@ -246,6 +246,7 @@ static void oss_midi_getdevs(char *indevlist, int *nindevs,
 struct midi_plugin* ossmidi_get_plugin() {
     static struct midi_plugin oss = {
         "oss-midi",
+        midi_oss_init,
         oss_do_open_midi,
         oss_close_midi,
         oss_putmidimess,
