@@ -19,4 +19,7 @@ struct midi_plugin
         char *outdevlist, int *noutdevs, int maxndev, int devdescsize);
 };
 
+/* hack to avoid (temporarily) working based on sys_midiapi because of
+ * header file dependencies
+ */
 extern struct midi_plugin* midi_system;

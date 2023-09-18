@@ -287,7 +287,7 @@ void midi_alsa_getdevs(char *indevlist, int *nindevs,
 
 struct midi_plugin* alsamidi_get_plugin() {
     static struct midi_plugin alsa = {
-        "alsa-midi",
+        "alsa-midi", // should be API_ALSA?
         midi_alsa_init,
         sys_alsa_do_open_midi,
         sys_alsa_close_midi,

@@ -190,6 +190,11 @@ void oss_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int *canmulti,
         int maxndev, int devdescsize);
 struct midi_plugin* ossmidi_get_plugin();
+#ifdef USEAPI_OSS
+#define MIDIAPI_OSS 1
+#else
+#define MIDIAPI_OSS 0
+#endif
 
 int alsa_open_audio(int naudioindev, int *audioindev, int nchindev,
     int *chindev, int naudiooutdev, int *audiooutdev, int nchoutdev,
@@ -201,6 +206,11 @@ void alsa_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int *canmulti,
         int maxndev, int devdescsize);
 struct midi_plugin* alsamidi_get_plugin();
+#ifdef USEAPI_ALSA
+#define MIDIAPI_ALSA 1
+#else
+#define MIDIAPI_ALSA 0
+#endif
 
 int jack_open_audio(int inchans, int outchans, t_audiocallback callback);
 void jack_close_audio(void);
