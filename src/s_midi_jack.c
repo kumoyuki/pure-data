@@ -1,5 +1,13 @@
 #include "s_midi_plugin.h"
 
+/* see the code for RtMidi.cpp for inspiration here
+ * https://ccrma.stanford.edu/~emgraber/256a/final/rtmidi/RtMidi.cpp
+ */
+
+#include "jack/jack.h"
+#include "jack/midiport.h"
+#include "jack/ringbuffer.h"
+
 
 void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutvec)
 {
@@ -27,7 +35,9 @@ void jack_midi_getdevs(char *indevlist, int *nindevs,
 }
 
 
-static void jack_midi_init() {}
+static void jack_midi_init() {
+    fprintf(stderr, "jack_midi_init\n");
+}
 
 
 static void jack_midi_save(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev)

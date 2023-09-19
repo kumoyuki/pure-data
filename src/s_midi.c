@@ -568,6 +568,11 @@ static void sys_save_midi_params(
 void sys_open_midi(int nmidiindev, int *midiindev,
     int nmidioutdev, int *midioutdev, int enable)
 {
+    fprintf(stderr,
+            "sys_open_midi %s enable=%d, n-indevs=%d, n-outdevs=%d\n",
+            midi_system->mp_name,
+            enable, nmidiindev, nmidioutdev);
+    
     if (enable)
     {
         (*midi_system->mp_init)();
