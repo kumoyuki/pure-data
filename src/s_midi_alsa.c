@@ -302,7 +302,7 @@ static void midi_alsa_save(int nmidiindev, int *midiindev, int nmidioutdev, int 
 
 struct midi_plugin* alsamidi_get_plugin() {
     static struct midi_plugin alsa = {
-        "alsa-midi", // should be API_ALSA?
+        "alsa-midi",
         midi_alsa_init,
         sys_alsa_do_open_midi,
         sys_alsa_close_midi,

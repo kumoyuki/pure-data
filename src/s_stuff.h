@@ -222,6 +222,14 @@ void jack_getdevs(char *indevlist, int *nindevs,
 void jack_listdevs(void);
 void jack_client_name(const char *name);
 void jack_autoconnect(int);
+struct midi_plugin* jackmidi_get_plugin();
+#ifdef USEAPI_JACK
+#define MIDIAPI_JACK 1
+#else
+#define MIDIAPI_JACK 0
+#endif
+
+#define MIDI_N_APIS (MIDIAPI_ALSA + MIDIAPI_OSS + MIDIAPI_JACK)
 
 int mmio_open_audio(int naudioindev, int *audioindev,
     int nchindev, int *chindev, int naudiooutdev, int *audiooutdev,

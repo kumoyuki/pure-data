@@ -690,6 +690,7 @@ AS_IF([test x$alsa = xyes], [midi_backends="ALSA ${midi_backends}"])
 AM_CONDITIONAL(JACK, test x$jack = xyes)
 AM_CONDITIONAL(JACK_FRAMEWORK, test x$jack_framework = xyes)
 AS_IF([test x$jack = xyes], [audio_backends="JACK ${audio_backends}"])
+AS_IF([test x$jack = xyes], [midi_backends="JACK ${midi_backends}"])
 
 ##### MMIO #####
 AM_CONDITIONAL(MMIO, test x$mmio = xyes)

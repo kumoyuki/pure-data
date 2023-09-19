@@ -258,7 +258,7 @@ endif
 # TODO support Jack xrun
 if JACK
 pd_CFLAGS += -DUSEAPI_JACK -DJACK_XRUN @JACK_CFLAGS@
-pd_SOURCES_standalone += s_audio_jack.c
+pd_SOURCES_standalone += s_audio_jack.c s_midi_jack.c
 
 if JACK_FRAMEWORK
 # link to Jackmp.framework on macOS

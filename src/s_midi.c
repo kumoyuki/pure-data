@@ -493,7 +493,8 @@ static char midi_indevnames[MAXMIDIINDEV * DEVDESCSIZE];
 static int midi_nmidioutdev;
 static int midi_midioutdev[MAXMIDIOUTDEV];
 static char midi_outdevnames[MAXMIDIINDEV * DEVDESCSIZE];
-static struct midi_plugin* midi_plugins[MIDIAPI_ALSA + MIDIAPI_OSS];
+size_t midi_n_apis = MIDI_N_APIS;
+struct midi_plugin* midi_plugins[MIDI_N_APIS];
 
 void sys_get_midi_apis(char *buf)
 {
@@ -509,6 +510,11 @@ void sys_get_midi_apis(char *buf)
 #ifdef USEAPI_ALSA
     midi_plugins[n] = alsamidi_get_plugin();
     sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, API_ALSA); n++;
+#endif
+#ifdef USEAPI_JACK
+    midi_plugins[n] = jackmidi_get_plugin();
+    fprintf(stderr, "jack plugin: %p\n", midi_plugins[n]);
+    sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, n); n++;
 #endif
     strcat(buf, "}");
         /* then again, if only one API (or none) we don't offer any choice. */
