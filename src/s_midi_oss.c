@@ -243,6 +243,13 @@ static void oss_midi_getdevs(char *indevlist, int *nindevs,
 }
 
 
+static void oss_midi_save(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev) {
+    /* apparently sys_save_midi_params() is adequate. For now (pre-JACK). may need
+     * to move its guts in here
+     */
+    return; }
+
+
 struct midi_plugin* ossmidi_get_plugin() {
     static struct midi_plugin oss = {
         "oss-midi", // should be API_DEFAULTMIDI?
@@ -252,7 +259,8 @@ struct midi_plugin* ossmidi_get_plugin() {
         oss_putmidimess,
         oss_putmidibyte,
         oss_poll_midi,
-        oss_midi_getdevs
+        oss_midi_getdevs,
+        oss_midi_save
     };
 
     fprintf(stderr, "getting oss midi plugin: %p\n", &oss);

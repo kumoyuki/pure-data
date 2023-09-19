@@ -17,6 +17,7 @@ struct midi_plugin
     void (*mp_getdevs) (
         char *indevlist, int *nindevs,
         char *outdevlist, int *noutdevs, int maxndev, int devdescsize);
+    void (*mp_save)(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev);
 };
 
 /* hack to avoid (temporarily) working based on sys_midiapi because of

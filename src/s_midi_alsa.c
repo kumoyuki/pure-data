@@ -285,6 +285,21 @@ void midi_alsa_getdevs(char *indevlist, int *nindevs,
 }
 
 
+static void midi_alsa_save(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev) {
+    /* invent a story so that saving/recalling "settings" will
+     * be able to restore the number of devices.  ALSA MIDI handling
+     * uses its own set of variables.  LATER figure out how to get
+     * this to work coherently
+     */
+    for (size_t i = 0; i < nmidiindev; i++)
+        midiindev[i] = i;
+    
+    for (size_t i = 0; i < nmidioutdev; i++)
+        midioutdev[i] = i;
+
+    return; }
+
+
 struct midi_plugin* alsamidi_get_plugin() {
     static struct midi_plugin alsa = {
         "alsa-midi", // should be API_ALSA?
@@ -294,7 +309,8 @@ struct midi_plugin* alsamidi_get_plugin() {
         sys_alsa_putmidimess,
         sys_alsa_putmidibyte,
         sys_alsa_poll_midi,
-        midi_alsa_getdevs
+        midi_alsa_getdevs,
+        midi_alsa_save
     };
 
     fprintf(stderr, "getting alsa midi plugin: %p\n", &alsa);

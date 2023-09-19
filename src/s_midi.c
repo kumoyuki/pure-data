@@ -726,38 +726,20 @@ void glob_midi_dialog(t_pd *dummy, t_symbol *s, int argc, t_atom *argv)
             noutdev++;
         }
     }
-    alsadevin = atom_getfloatarg(18, argc, argv);
-    alsadevout = atom_getfloatarg(19, argc, argv);
-#ifdef USEAPI_ALSA
-            /* invent a story so that saving/recalling "settings" will
-            be able to restore the number of devices.  ALSA MIDI handling
-            uses its own set of variables.  LATER figure out how to get
-            this to work coherently */
+
     if (sys_midiapi == API_ALSA)
     {
-        nindev = alsadevin;
-        noutdev = alsadevout;
-        for (i = 0; i < nindev; i++)
-            newmidiindev[i] = i;
-        for (i = 0; i < noutdev; i++)
-            newmidioutdev[i] = i;
-    }
-#endif
-    sys_save_midi_params(nindev, newmidiindev,
-        noutdev, newmidioutdev);
-#ifdef USEAPI_ALSA
-    if (sys_midiapi == API_ALSA)
-    {
-        sys_alsa_close_midi();
-        sys_open_midi(alsadevin, newmidiindev, alsadevout, newmidioutdev, 1);
-    }
-    else
-#endif
-    {
-        sys_close_midi();
-        sys_open_midi(nindev, newmidiindev, noutdev, newmidioutdev, 1);
+        nindev = atom_getfloatarg(18, argc, argv);
+        noutdev = atom_getfloatarg(19, argc, argv);
     }
 
+    /* TODO: merge specific & generic midi save */
+    (*midi_system->mp_save)(nindev, newmidiindev, noutdev, newmidioutdev);
+    sys_save_midi_params(nindev, newmidiindev,
+        noutdev, newmidioutdev);
+
+    sys_close_midi();
+    sys_open_midi(nindev, newmidiindev, noutdev, newmidioutdev, 1);
 }
 
 void sys_get_midi_devs(char *indevlist, int *nindevs,
