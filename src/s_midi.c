@@ -505,7 +505,7 @@ void sys_get_midi_apis(char *buf)
     strcpy(buf, "{ ");
 #ifdef USEAPI_OSS
     midi_plugins[n] = ossmidi_get_plugin();
-    sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, API_DEFAULTMIDI); n++;
+    sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, API_OSS); n++;
 #endif
 #ifdef USEAPI_ALSA
     midi_plugins[n] = alsamidi_get_plugin();
@@ -514,7 +514,7 @@ void sys_get_midi_apis(char *buf)
 #ifdef USEAPI_JACK
     midi_plugins[n] = jackmidi_get_plugin();
     fprintf(stderr, "jack plugin: %p\n", midi_plugins[n]);
-    sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, n); n++;
+    sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, API_JACK); n++;
 #endif
     strcat(buf, "}");
         /* then again, if only one API (or none) we don't offer any choice. */
@@ -569,8 +569,8 @@ void sys_open_midi(int nmidiindev, int *midiindev,
     int nmidioutdev, int *midioutdev, int enable)
 {
     fprintf(stderr,
-            "sys_open_midi %s enable=%d, n-indevs=%d, n-outdevs=%d\n",
-            midi_system->mp_name,
+            "sys_open_midi %s, api=%d enable=%d, n-indevs=%d, n-outdevs=%d\n",
+            midi_system->mp_name, sys_midiapi,
             enable, nmidiindev, nmidioutdev);
     
     if (enable)
@@ -620,21 +620,31 @@ void sys_listmididevs(void)
 
 void sys_set_midi_api(int which)
 {
+    fprintf(stderr, "sys_set_midi_api, which=%d\n", which);
     switch (which) {
 #ifdef USEAPI_ALSA
     case(API_ALSA):
+        fprintf(stderr, "sys_set_midi_api, alsa\n", which);
         midi_system = alsamidi_get_plugin();
         break;
 #endif
 #ifndef FORCEAPI_ALSA
-    case(API_DEFAULTMIDI): break;
+    case(API_DEFAULTMIDI):
+        fprintf(stderr, "sys_set_midi_api, api_default\n", which);
+        break;
 #endif
 #ifdef USEAPI_OSS
     case(API_OSS):
+        fprintf(stderr, "sys_set_midi_api, oss\n", which);
         midi_system = ossmidi_get_plugin();
+        break;
+    case(API_JACK):
+        fprintf(stderr, "sys_set_midi_api, jack\n", which);
+        midi_system = jackmidi_get_plugin();
         break;
 #endif
     default:
+        fprintf(stderr, "sys_set_midi_api ignoring unknown MIDI API %d\n", which);
         logpost(NULL, PD_VERBOSE, "ignoring unknown MIDI API %d", which);
         return;
     }
@@ -652,7 +662,7 @@ void glob_midi_setapi(void *dummy, t_floatarg f)
     if (newapi != sys_midiapi)
     {
         sys_close_midi();
-        sys_midiapi = newapi;
+        sys_set_midi_api(newapi);
         sys_reopen_midi();
     }
 #ifdef USEAPI_ALSA
