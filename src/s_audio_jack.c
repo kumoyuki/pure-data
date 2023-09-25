@@ -59,6 +59,13 @@ PA_VOLATILE sys_ringbuf jack_inring;
 
 /* #define TESTCANSLEEP */
 
+int jack_is_jack_midi() {
+    static struct midi_plugin* jack_plugin = 0;
+    if(jack_plugin == 0)
+        jack_plugin = jackmidi_get_plugin();
+    return jack_plugin == midi_system; }
+
+
     /* callback routine for non-callback client... throw samples into
         and read them out of a FIFO.  Since we don't know at compile time
         how many samples jack will treat us to, we interleave them in the
@@ -124,7 +131,7 @@ static int jack_polling_callback(jack_nframes_t nframes, void *unused)
         }
     }
 
-    if(midi_system == jackmidi_get_plugin())
+    if(jack_is_jack_midi())
         jackmidi_process();
     
     pthread_cond_broadcast(&jack_sem);
