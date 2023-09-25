@@ -7,26 +7,14 @@
 
 #ifdef USEAPI_JACK
 
+#include "s_jack.h"
+#include "s_midi_plugin.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "m_pd.h"
-#include "s_stuff.h"
-#include "s_audio_paring.h"
-#ifdef __APPLE__
-#include <jack/weakjack.h>
-#endif
-#include <jack/jack.h>
 #include <regex.h>
-
-#define MAX_CLIENTS 100
-#define MAX_JACK_PORTS 128  /* higher values seem to give bad xrun problems */
-#define BUF_JACK 4096
-/* taken from the PipeWire libjack implementation: the larger of the
- * `JACK_CLIENT_NAME_SIZE` definitions I could find in the wild. */
-#define CLIENT_NAME_SIZE_FALLBACK 128
-
 
 #ifndef HAVE_ALLOCA     /* can work without alloca() but we never need it */
 # define HAVE_ALLOCA 1
@@ -50,24 +38,24 @@
 
 #define MAX_ALLOCA_SAMPLES 16*1024
 
-static jack_nframes_t jack_out_max;
-static jack_nframes_t jack_filled = 0;
-static int jack_started = 0;
-static jack_port_t *input_port[MAX_JACK_PORTS];
-static jack_port_t *output_port[MAX_JACK_PORTS];
-static jack_client_t *jack_client = NULL;
-static char * desired_client_name = NULL;
+jack_nframes_t jack_out_max;
+jack_nframes_t jack_filled = 0;
+int jack_started = 0;
+jack_port_t *input_port[MAX_JACK_PORTS];
+jack_port_t *output_port[MAX_JACK_PORTS];
+jack_client_t *jack_client = NULL;
+char * desired_client_name = NULL;
 char *jack_client_names[MAX_CLIENTS];
-static int jack_dio_error;
-static t_audiocallback jack_callback;
-static int jack_should_autoconnect = 1;
-static int jack_blocksize = 0; /* should this be PERTHREAD? */
+int jack_dio_error;
+t_audiocallback jack_callback;
+int jack_should_autoconnect = 1;
+int jack_blocksize = 0; /* should this be PERTHREAD? */
 pthread_mutex_t jack_mutex;
 pthread_cond_t jack_sem;
-static PA_VOLATILE char *jack_outbuf;
-static PA_VOLATILE sys_ringbuf jack_outring;
-static PA_VOLATILE char *jack_inbuf;
-static PA_VOLATILE sys_ringbuf jack_inring;
+PA_VOLATILE char *jack_outbuf;
+PA_VOLATILE sys_ringbuf jack_outring;
+PA_VOLATILE char *jack_inbuf;
+PA_VOLATILE sys_ringbuf jack_inring;
 
 /* #define TESTCANSLEEP */
 
@@ -135,6 +123,10 @@ static int jack_polling_callback(jack_nframes_t nframes, void *unused)
             }
         }
     }
+
+    if(midi_system == jackmidi_get_plugin())
+        jackmidi_process();
+    
     pthread_cond_broadcast(&jack_sem);
     pthread_mutex_unlock(&jack_mutex);
     FREEA(t_sample, muxbuffer, muxbufsize, MAX_ALLOCA_SAMPLES);
