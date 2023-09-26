@@ -7,6 +7,8 @@
 #include "s_jack.h"
 #include "jack/midiport.h"
 
+#include <string.h>
+
 /* PD appears to have its own, nominally JACK-compatible ringbuffers
 #include "jack/ringbuffer.h"
 */
@@ -21,11 +23,11 @@ static sys_ringbuf* j_buffer_message = 0;
 static jack_time_t j_last_time;
 
 static size_t j_inport_count = 0;
-static char** j_inport_names = 0;
+static char const** j_inport_names = 0;
 static size_t j_outport_count = 0;
-static char** j_outport_names = 0;
+static char const** j_outport_names = 0;
 
-char** jackmidi_get_ports(enum JackPortFlags pf) {
+char const** jackmidi_get_ports(enum JackPortFlags pf) {
     if(jack_client == 0)
         return 0;
     
@@ -59,15 +61,6 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
     j_client = jack_client;
 #endif
 
-    fprintf(stderr, "reading available midi ports...\n");
-    j_inport_names = jackmidi_get_ports(JackPortIsInput);
-    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++)
-        fprintf(stderr, "  midi inport: %s\n", j_inport_names[j_inport_count]);
-    
-    j_outport_names = jackmidi_get_ports(JackPortIsOutput);
-    for(j_outport_count = 0; j_outport_names && j_outport_names[j_outport_count]; j_outport_count++)
-        fprintf(stderr, "  midi outport: %s\n", j_inport_names[j_outport_count]);
-    
     fprintf(stderr, "registering midi port(s)...\n");
     for(size_t n = 0; n < nmidiin; n++) {
         char name[256];
@@ -101,6 +94,28 @@ void jack_poll_midi(void)
 void jack_midi_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int maxndev, int devdescsize)
 {
+    int use_devs = 0;
+    
+    fprintf(stderr, "jack_midi_getdevs: reading available midi ports...\n");
+    j_inport_names = jackmidi_get_ports(JackPortIsInput);
+    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++)
+        fprintf(stderr, "  midi inport: %s\n", j_inport_names[j_inport_count]);
+    
+    use_devs = (j_inport_count > maxndev) ?maxndev :j_inport_count;
+    *nindevs = use_devs;
+    for(size_t i = 0; i < use_devs; i++)
+        strcpy(indevlist + i * devdescsize, j_inport_names[i]);
+    
+    j_outport_names = jackmidi_get_ports(JackPortIsOutput);
+    for(j_outport_count = 0; j_outport_names && j_outport_names[j_outport_count]; j_outport_count++)
+        fprintf(stderr, "  midi outport: %s\n", j_inport_names[j_outport_count]);
+
+    use_devs = (j_outport_count > maxndev) ?maxndev :j_outport_count;
+    *noutdevs = use_devs;
+    for(size_t i = 0; i < use_devs; i++)
+        strcpy(outdevlist + i * devdescsize, j_outport_names[i]);
+
+    return;
 }
 
 
