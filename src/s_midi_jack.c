@@ -20,6 +20,18 @@ static sys_ringbuf* j_buffer_size = 0;
 static sys_ringbuf* j_buffer_message = 0;
 static jack_time_t j_last_time;
 
+static size_t j_inport_count = 0;
+static char** j_inport_names = 0;
+static size_t j_outport_count = 0;
+static char** j_outport_names = 0;
+
+char** jackmidi_get_ports(enum JackPortFlags pf) {
+    if(jack_client == 0)
+        return 0;
+    
+    return
+        jack_get_ports(jack_client, NULL, JACK_DEFAULT_MIDI_TYPE, pf); }
+
 
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     return 0; }
@@ -47,8 +59,25 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
     j_client = jack_client;
 #endif
 
+    fprintf(stderr, "reading available midi ports...\n");
+    j_inport_names = jackmidi_get_ports(JackPortIsInput);
+    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++)
+        fprintf(stderr, "  midi inport: %s\n", j_inport_names[j_inport_count]);
+    
+    j_outport_names = jackmidi_get_ports(JackPortIsOutput);
+    for(j_outport_count = 0; j_outport_names && j_outport_names[j_outport_count]; j_outport_count++)
+        fprintf(stderr, "  midi outport: %s\n", j_inport_names[j_outport_count]);
+    
     fprintf(stderr, "registering midi port(s)...\n");
-    jack_port_register(jack_client, "pd-midi", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+    for(size_t n = 0; n < nmidiin; n++) {
+        char name[256];
+        sprintf(name, "midi-in-%zu", n);
+        jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0); }
+
+    for(size_t n = 0; n < nmidiout; n++) {
+        char name[256];
+        sprintf(name, "midi-out-%zu", n);
+        jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0); }
 
     return; }
 
