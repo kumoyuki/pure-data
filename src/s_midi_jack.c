@@ -117,13 +117,18 @@ void jack_midi_getdevs(
     fprintf(stderr, "jack_midi_getdevs: reading available midi ports...\n");
 
     // clean up old devs
-    if(j_inport_names != 0) free(j_inport_names);
-    if(j_outport_names != 0) free(j_outport_names);
+    if(j_inport_names != 0) jack_free(j_inport_names);
+    if(j_outport_names != 0) jack_free(j_outport_names);
 
     // get midi connection ports
     j_inport_names = jackmidi_get_ports(JackPortIsInput);
-    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++)
-        fprintf(stderr, "  midi inport: %s\n", j_inport_names[j_inport_count]);
+    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++) {
+        jack_port_t* port = jack_port_by_name(jack_client, j_inport_names[j_inport_count]); 
+        fprintf(stderr, "  midi inport: %s, %s\n",
+                j_inport_names[j_inport_count],
+                jack_port_type(port));
+        
+        continue; }
     
     j_outport_names = jackmidi_get_ports(JackPortIsOutput);
     for(j_outport_count = 0; j_outport_names && j_outport_names[j_outport_count]; j_outport_count++)
