@@ -22,17 +22,26 @@ static sys_ringbuf* j_buffer_size = 0;
 static sys_ringbuf* j_buffer_message = 0;
 static jack_time_t j_last_time;
 
+// midi ports in the global environment
 static size_t j_inport_count = 0;
 static char const** j_inport_names = 0;
 static size_t j_outport_count = 0;
 static char const** j_outport_names = 0;
+
+// midi ports we create
+static size_t jm_inport_count = 0;
+static char const** jm_inport_names = 0;
+static size_t jm_outport_count = 0;
+static char const** jm_outport_names = 0;
+
 
 char const** jackmidi_get_ports(enum JackPortFlags pf) {
     if(jack_client == 0)
         return 0;
     
     return
-        jack_get_ports(jack_client, NULL, JACK_DEFAULT_MIDI_TYPE, pf); }
+            // JACK_DEFAULT_MIDI_TYPE
+        jack_get_ports(jack_client, NULL, NULL, pf); }
 
 
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
@@ -63,14 +72,23 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
 
     fprintf(stderr, "registering midi port(s)...\n");
     for(size_t n = 0; n < nmidiin; n++) {
+        int port_number = midiinvec[n];
+        fprintf(stderr, "  midiinvec[%zd] = %d\n", n, port_number);
+
         char name[256];
         sprintf(name, "midi-in-%zu", n);
-        jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0); }
+         // indexes into j_outport_names, these are the connections we must make 
+        jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+        jack_connect(jack_client, j_outport_names[port_number], name);
+        continue; }
 
     for(size_t n = 0; n < nmidiout; n++) {
         char name[256];
         sprintf(name, "midi-out-%zu", n);
-        jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0); }
+        // index to j_inport_names, these are the connections we must make 
+        fprintf(stderr, "  midioutvec[%zd] = %d\n", n, midioutvec[n]);
+        /* jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0); */
+        continue; }
 
     return; }
 
@@ -91,29 +109,36 @@ void jack_poll_midi(void)
 {
 }
 
-void jack_midi_getdevs(char *indevlist, int *nindevs,
-    char *outdevlist, int *noutdevs, int maxndev, int devdescsize)
+void jack_midi_getdevs(
+    char *indevlist, int *nindevs, char *outdevlist, int *noutdevs, int maxndev, int devdescsize)
 {
     int use_devs = 0;
     
     fprintf(stderr, "jack_midi_getdevs: reading available midi ports...\n");
+
+    // clean up old devs
+    if(j_inport_names != 0) free(j_inport_names);
+    if(j_outport_names != 0) free(j_outport_names);
+
+    // get midi connection ports
     j_inport_names = jackmidi_get_ports(JackPortIsInput);
     for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++)
         fprintf(stderr, "  midi inport: %s\n", j_inport_names[j_inport_count]);
     
-    use_devs = (j_inport_count > maxndev) ?maxndev :j_inport_count;
-    *nindevs = use_devs;
-    for(size_t i = 0; i < use_devs; i++)
-        strcpy(indevlist + i * devdescsize, j_inport_names[i]);
-    
     j_outport_names = jackmidi_get_ports(JackPortIsOutput);
     for(j_outport_count = 0; j_outport_names && j_outport_names[j_outport_count]; j_outport_count++)
-        fprintf(stderr, "  midi outport: %s\n", j_inport_names[j_outport_count]);
+        fprintf(stderr, "  midi outport: %s\n", j_outport_names[j_outport_count]);
 
+    // make devices appear in UI
     use_devs = (j_outport_count > maxndev) ?maxndev :j_outport_count;
+    *nindevs = use_devs;
+    for(size_t i = 0; i < use_devs; i++)
+        strcpy(indevlist + i * devdescsize, j_outport_names[i]);
+    
+    use_devs = (j_outport_count > maxndev) ?maxndev :j_inport_count;
     *noutdevs = use_devs;
     for(size_t i = 0; i < use_devs; i++)
-        strcpy(outdevlist + i * devdescsize, j_outport_names[i]);
+        strcpy(outdevlist + i * devdescsize, j_inport_names[i]);
 
     return;
 }
