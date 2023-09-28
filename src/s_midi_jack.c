@@ -73,7 +73,7 @@ void jm_resize_ports(unsigned long flags, int nmidi) {
     return; }
 
     
-void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char** names) {
+void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** names) {
     int rc = 0;
 
     fprintf(stderr, "jm_bind_ports: x%lx, nmidi=%d\n", flags, nmidi);
@@ -156,28 +156,6 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
 //    fprintf(stderr, "registering %d midi input port(s), %zd outports\n", nmidiin, j_outport_count);
     if(j_outport_count == 0) return;
     jm_bind_ports(JackPortIsInput, nmidiin, midiinvec, j_outport_names);
-    if(nmidiin >= jm_inport_count) {
-        jm_inport_count += 1;
-        jm_inports = realloc(jm_inports, nmidiin * (sizeof *jm_inports)); }
-        
-    for(size_t n = 0; n < nmidiin; n++) {
-        char name[256];
-        sprintf(name, "midi-in-%zu", n);
-        jm_inports[n] = jm_create_port(name, JackPortIsInput);
-        
-        fprintf(stderr, "created jack_port_t* port = %p\n", jm_inports[n]);
-        port_name = jack_port_name(jm_inports[n]);
-        if(jm_inports[n] != 0) {
-            size_t port_number = midiinvec[n];
-            jack_port_t* remote = jack_port_by_name(j_client, j_outport_names[port_number]);
-            rc = jack_connect(j_client, j_outport_names[port_number], port_name);
-            fprintf(stderr, "jack_connect %s(%p) -> %s(%p), rc=%d, errno=%d \"%s\"\n",
-                    j_outport_names[port_number], remote, name, jm_inports[n], rc,
-                    errno, strerror(errno)); }
-        else
-            fprintf(stderr, "failed to register port %s\n", name);
-        
-        continue; }
 
     if(j_inport_count == 0) return;
     jm_bind_ports(JackPortIsOutput, nmidiout, midioutvec, j_inport_names);
@@ -212,20 +190,15 @@ void jack_midi_getdevs(
     if(j_inport_names != 0) jack_free(j_inport_names);
     if(j_outport_names != 0) jack_free(j_outport_names);
 
-    // get midi connection ports
+    // get midi connection ports, note that we have to count our way through the list
+    // so we know how many devices to display
     j_inport_names = jm_get_ports(JackPortIsInput);
-    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++) {
-        jack_port_t* port = jack_port_by_name(j_client, j_inport_names[j_inport_count]); 
-        fprintf(stderr, "  midi inport: %s, %s\n",
-                j_inport_names[j_inport_count],
-                // jack_port_short_name(port),
-                jack_port_type(port));
-        
-        continue; }
+    for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++)
+        ;//fprintf(stderr, "  midi inport: %s\n", j_inport_names[j_inport_count]);
     
     j_outport_names = jm_get_ports(JackPortIsOutput);
     for(j_outport_count = 0; j_outport_names && j_outport_names[j_outport_count]; j_outport_count++)
-        fprintf(stderr, "  midi outport: %s\n", j_outport_names[j_outport_count]);
+        ;//fprintf(stderr, "  midi outport: %s\n", j_outport_names[j_outport_count]);
 
     // make devices appear in UI
     use_devs = (j_outport_count > maxndev) ?maxndev :j_outport_count;
