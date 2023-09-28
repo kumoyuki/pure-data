@@ -122,6 +122,15 @@ char const** jm_get_ports(enum JackPortFlags pf) {
 
 
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
+    // the void is user data, of which we have none
+
+    for(size_t i=0; i < jm_inport_count; i++) {
+        void* pb = jack_port_get_buffer(jm_inports[i], n_frames);
+        jack_nframes_t ic = jack_midi_get_event_count(pb);
+        if(ic > 0)
+            fprintf(stderr, "jack_process_midi %d from %s\n", ic, jack_port_name(jm_inports[i]));
+        continue; }
+    
     return 0; }
 
 
