@@ -7,6 +7,7 @@
 #include "s_jack.h"
 #include "jack/midiport.h"
 
+#include <errno.h>
 #include <string.h>
 
 /* PD appears to have its own, nominally JACK-compatible ringbuffers
@@ -36,12 +37,12 @@ static char const** jm_outport_names = 0;
 
 
 char const** jackmidi_get_ports(enum JackPortFlags pf) {
-    if(jack_client == 0)
+    if(j_client == 0)
         return 0;
     
     return
             // JACK_DEFAULT_MIDI_TYPE
-        jack_get_ports(jack_client, NULL, NULL, pf); }
+        jack_get_ports(j_client, NULL, JACK_DEFAULT_MIDI_TYPE, pf); }
 
 
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
@@ -49,10 +50,12 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
 
 void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutvec) {
-    fprintf(stderr, "jack_do_open_midi n_midi_in=%d, n_midi_out=%d\n", nmidiin, nmidiout);
+    int rc = 0;
+    
+    fprintf(stderr, "jack_do_open_midi %s client=%p, n_midi_in=%d, n_midi_out=%d\n",
+            jack_get_version_string(), jack_client, nmidiin, nmidiout);
 
 #if defined(USE_LOCAL_MIDI)
-    fprintf(stderr, "jack_do_open_midi n_midi_in=%d, n_midi_out=%d\n", nmidiin, nmidiout);
     if(j_client != 0)
         return;
 
@@ -67,27 +70,45 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
     int rc = jack_activate(j_client);
     fprintf(stderr, "jack_activate -> rc=%d\n", rc);
 #else
+    fprintf(stderr, "j_client <- jack_client (%p)\n", jack_client);
     j_client = jack_client;
 #endif
 
-    fprintf(stderr, "registering midi port(s)...\n");
+    if(j_outport_count == 0) return;
+    fprintf(stderr, "registering %d midi input port(s), %zd outports\n", nmidiin, j_outport_count);
     for(size_t n = 0; n < nmidiin; n++) {
         int port_number = midiinvec[n];
         fprintf(stderr, "  midiinvec[%zd] = %d\n", n, port_number);
 
         char name[256];
         sprintf(name, "midi-in-%zu", n);
+        fprintf(stderr, "creating local port %s with client %p\n", name, j_client);
          // indexes into j_outport_names, these are the connections we must make 
-        jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
-        jack_connect(jack_client, j_outport_names[port_number], name);
+        jack_port_t* port =
+            jack_port_register(j_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
+        if(port == 0) {
+            fprintf(stderr, "looking up port %s\n", name);
+            // this needs the client name glued in front of it
+            port = jack_port_by_name(j_client, name); }
+        
+        fprintf(stderr, "created jack_port_t* port = %p\n", port);
+        if(port != 0) {
+            jack_port_t* remote = jack_port_by_name(j_client, j_outport_names[port_number]);
+            rc = jack_connect(j_client, j_outport_names[port_number], name);
+            fprintf(stderr, "jack_connect %s(%p) -> %s(%p), rc=%d, errno=%d \"%s\"\n",
+                    j_outport_names[port_number], remote, name, port, rc, errno, strerror(errno)); }
+        else
+            fprintf(stderr, "failed to register port %s\n", name);
+        
         continue; }
 
+    if(j_inport_count == 0) return;
     for(size_t n = 0; n < nmidiout; n++) {
         char name[256];
         sprintf(name, "midi-out-%zu", n);
         // index to j_inport_names, these are the connections we must make 
         fprintf(stderr, "  midioutvec[%zd] = %d\n", n, midioutvec[n]);
-        /* jack_port_register(jack_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0); */
+        /* jack_port_register(j_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0); */
         continue; }
 
     return; }
@@ -114,7 +135,7 @@ void jack_midi_getdevs(
 {
     int use_devs = 0;
     
-    fprintf(stderr, "jack_midi_getdevs: reading available midi ports...\n");
+    fprintf(stderr, "jack_midi_getdevs: client %p reading available midi ports...\n", j_client);
 
     // clean up old devs
     if(j_inport_names != 0) jack_free(j_inport_names);
@@ -123,9 +144,10 @@ void jack_midi_getdevs(
     // get midi connection ports
     j_inport_names = jackmidi_get_ports(JackPortIsInput);
     for(j_inport_count = 0; j_inport_names && j_inport_names[j_inport_count]; j_inport_count++) {
-        jack_port_t* port = jack_port_by_name(jack_client, j_inport_names[j_inport_count]); 
+        jack_port_t* port = jack_port_by_name(j_client, j_inport_names[j_inport_count]); 
         fprintf(stderr, "  midi inport: %s, %s\n",
                 j_inport_names[j_inport_count],
+                // jack_port_short_name(port),
                 jack_port_type(port));
         
         continue; }
