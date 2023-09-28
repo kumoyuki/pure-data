@@ -51,6 +51,8 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
 void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutvec) {
     int rc = 0;
+    char* client_name = 0;
+    char* port_name = 0;
     
     fprintf(stderr, "jack_do_open_midi %s client=%p, n_midi_in=%d, n_midi_out=%d\n",
             jack_get_version_string(), jack_client, nmidiin, nmidiout);
@@ -74,6 +76,8 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
     j_client = jack_client;
 #endif
 
+    client_name = jack_get_client_name(j_client);
+
     if(j_outport_count == 0) return;
     fprintf(stderr, "registering %d midi input port(s), %zd outports\n", nmidiin, j_outport_count);
     for(size_t n = 0; n < nmidiin; n++) {
@@ -87,14 +91,17 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
         jack_port_t* port =
             jack_port_register(j_client, name, JACK_DEFAULT_MIDI_TYPE, JackPortIsInput, 0);
         if(port == 0) {
-            fprintf(stderr, "looking up port %s\n", name);
+            char full_name[512];
+            sprintf(full_name, "%s:%s", client_name, name);
+            fprintf(stderr, "looking up port %s\n", full_name);
             // this needs the client name glued in front of it
             port = jack_port_by_name(j_client, name); }
         
         fprintf(stderr, "created jack_port_t* port = %p\n", port);
+        port_name = jack_port_name(port);
         if(port != 0) {
             jack_port_t* remote = jack_port_by_name(j_client, j_outport_names[port_number]);
-            rc = jack_connect(j_client, j_outport_names[port_number], name);
+            rc = jack_connect(j_client, j_outport_names[port_number], port_name);
             fprintf(stderr, "jack_connect %s(%p) -> %s(%p), rc=%d, errno=%d \"%s\"\n",
                     j_outport_names[port_number], remote, name, port, rc, errno, strerror(errno)); }
         else
