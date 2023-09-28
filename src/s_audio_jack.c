@@ -131,8 +131,8 @@ static int jack_polling_callback(jack_nframes_t nframes, void *unused)
         }
     }
 
-    if(jack_is_jack_midi())
-        jackmidi_process();
+//    if(jack_is_jack_midi())
+//        jackmidi_process();
     
     pthread_cond_broadcast(&jack_sem);
     pthread_mutex_unlock(&jack_mutex);
