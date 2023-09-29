@@ -222,10 +222,12 @@ void jack_getdevs(char *indevlist, int *nindevs,
 void jack_listdevs(void);
 void jack_client_name(const char *name);
 void jack_autoconnect(int);
-void jackmidi_process();
 struct midi_plugin* jackmidi_get_plugin();
 #ifdef USEAPI_JACK
+#include <jack/jack.h>
 #define MIDIAPI_JACK 1
+
+void jackmidi_process(jack_nframes_t nf, void* j);
 #else
 #define MIDIAPI_JACK 0
 #endif
@@ -270,6 +272,8 @@ void dummy_getdevs(char *indevlist, int *nindevs, char *outdevlist,
 void dummy_listdevs(void);
 
                     /* s_midi.c */
+#define USE_LOCAL_MIDI 1
+
 #define MAXMIDIINDEV 16         /* max. number of input ports */
 #define MAXMIDIOUTDEV 16        /* max. number of output ports */
 extern int sys_midiapi;
