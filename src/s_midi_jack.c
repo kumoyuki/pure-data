@@ -86,11 +86,11 @@ void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** na
         
         char name[256];
         sprintf(name, "midi-%s-%zu", side, n);
-        jm_inports[n] = jm_create_port(name, flags);
+        jack_port_t* port = jm_create_port(name, flags);
         
-        fprintf(stderr, "created jack_port_t* port = %p\n", jm_inports[n]);
-        char const* port_name = jack_port_name(jm_inports[n]);
-        if(jm_inports[n] != 0) {
+        fprintf(stderr, "created jack_port_t* port = %p\n", port);
+        char const* port_name = jack_port_name(port);
+        if(port != 0) {
             size_t port_number = midivec[n];
             jack_port_t* remote = jack_port_by_name(j_client, names[port_number]);
 
@@ -98,9 +98,14 @@ void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** na
                 rc = jack_connect(j_client, names[port_number], port_name);
             else
                 rc = jack_connect(j_client, port_name, names[port_number]);
+
+            if(flags & JackPortIsInput)
+                jm_inports[n] = port;
+            else
+                jm_outports[n] = port;
             
-            fprintf(stderr, "jack_connect %s(%p) -> %s(%p), rc=%d, errno=%d \"%s\"\n",
-                    names[port_number], remote, name, jm_inports[n], rc,
+            fprintf(stderr, "jack_connect %s %s(%p) -> %s(%p), rc=%d, errno=%d \"%s\"\n",
+                    side, names[port_number], remote, name, rc,
                     errno, strerror(errno)); }
         else
             fprintf(stderr, "failed to register port %s\n", name);
@@ -125,10 +130,21 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     // the void is user data, of which we have none
 
     for(size_t i=0; i < jm_inport_count; i++) {
-        void* pb = jack_port_get_buffer(jm_inports[i], n_frames);
+        jack_port_t* port = jm_inports[i];
+        char const* name = jack_port_name(port);
+        if(name == 0) {
+            fprintf(stderr, "failed to get port name for %zd, %p\n", i, port);
+            continue; }
+
+        void* pb = jack_port_get_buffer(port, n_frames);
+
+        //fprintf(stderr, "jack_process_midi: checking inport %zd, %s, buffer=%p\n",
+        //        i, name, pb);
+        
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0)
-            fprintf(stderr, "jack_process_midi %d from %s\n", ic, jack_port_name(jm_inports[i]));
+            fprintf(stderr, "jack_process_midi %d from %s\n", ic, name);
+        
         continue; }
     
     return 0; }
@@ -142,7 +158,6 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
     fprintf(stderr, "jack_do_open_midi %s client=%p, n_midi_in=%d, n_midi_out=%d\n",
             jack_get_version_string(), jack_client, nmidiin, nmidiout);
 
-#define USE_LOCAL_MIDI 1
 #if defined(USE_LOCAL_MIDI)
     if(j_client != 0)
         return;
@@ -239,7 +254,8 @@ static void jack_midi_save(int nmidiindev, int *midiindev, int nmidioutdev, int 
 }
 
 
-void jackmidi_process() {
+void jackmidi_process(jack_nframes_t nf, void* j) {
+    jack_process_midi(nf, j);
     return; }
 
 struct midi_plugin* jackmidi_get_plugin() {
