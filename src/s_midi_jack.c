@@ -42,6 +42,8 @@ static jack_port_t** jm_inports;
 static size_t jm_outport_count = 0;
 static jack_port_t** jm_outports;
 
+static int jack_process_midi(jack_nframes_t n_frames, void* j);
+
 
 static jack_port_t* jm_create_port(char const* name, unsigned long flags) {
     if(j_client == 0) return 0;
@@ -115,6 +117,24 @@ void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** na
     return; }
 
 
+jack_client_t* jm_get_client() {
+    if(j_client != 0)
+        return j_client;
+
+    j_client = jack_client_open(JACK_MIDI_CLIENT_NAME, JackNoStartServer, NULL);
+    if(j_client == 0) {
+        fprintf(stderr, "jm_get_client: could not start jack connection\n");
+        return 0; }
+    else
+        fprintf(stderr, "j_client = %p, name=%s\n", j_client, jack_get_client_name(j_client));
+
+    jack_set_process_callback(j_client, jack_process_midi, NULL);
+    int rc = jack_activate(j_client);
+//    fprintf(stderr, "jack_activate -> rc=%d\n", rc);
+
+    return j_client; }
+
+
 char const** jm_get_ports(enum JackPortFlags pf) {
     if(j_client == 0)
         return 0;
@@ -162,19 +182,9 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
             jack_get_version_string(), jack_client, nmidiin, nmidiout);
 
 #if defined(USE_LOCAL_MIDI)
-    if(j_client != 0)
+    j_client = jm_get_client();
+    if(j_client == 0)
         return;
-
-    j_client = jack_client_open(JACK_MIDI_CLIENT_NAME, JackNoStartServer, NULL);
-    if(j_client == 0) {
-        fprintf(stderr, "could not start jack connection\n");
-        return; }
-    else
-        fprintf(stderr, "j_client = %p, name=%s\n", j_client, jack_get_client_name(j_client));
-
-    jack_set_process_callback(j_client, jack_process_midi, NULL);
-    rc = jack_activate(j_client);
-//    fprintf(stderr, "jack_activate -> rc=%d\n", rc);
 #else
     fprintf(stderr, "j_client <- jack_client (%p)\n", jack_client);
     j_client = jack_client;
@@ -210,9 +220,12 @@ void jack_midi_getdevs(
     char *indevlist, int *nindevs, char *outdevlist, int *noutdevs, int maxndev, int devdescsize)
 {
     int use_devs = 0;
-    
-    fprintf(stderr, "jack_midi_getdevs: client %p reading available midi ports...\n", j_client);
 
+    j_client = jm_get_client();
+    fprintf(stderr, "jack_midi_getdevs: client %p reading available midi ports...\n", j_client);
+    if(j_client == 0)
+        return;
+    
     // clean up old devs
     if(j_inport_names != 0) jack_free(j_inport_names);
     if(j_outport_names != 0) jack_free(j_outport_names);
