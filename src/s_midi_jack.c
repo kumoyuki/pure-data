@@ -138,29 +138,14 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         void* pb = jack_port_get_buffer(port, n_frames);
 
-        //fprintf(stderr, "jack_process_midi: checking inport %zd, %s, buffer=%p\n",
-        //        i, name, pb);
-        
-        jack_nframes_t ic = jack_midi_get_event_count(pb);
-        if(ic > 0)
-            fprintf(stderr, "jack_process_midi %d from %s\n", ic, name);
-        
+        jack_nframes_t ic = jack_midi_get_event_count(pb);        
         for(int e = 0; e < ic; e++) {
             jack_midi_event_t event;
+
             int r = jack_midi_event_get (&event, pb, e);
-            fprintf(stderr, "midi event: rc=%d @%d, %zd bytes\n", r, event.time, event.size);
             for(size_t s=0; r==0 && s<event.size; s++)
                 sys_midibytein(i, event.buffer[s]);
             
-#if defined(JACK_SOURCE_CODE)
-            if (r == 0 && jack_ringbuffer_write_space (rb) >= sizeof(midimsg)) {
-                midimsg m;
-                m.tme_mon = monotonic_cnt;
-                m.tme_rel = event.time;
-                m.size    = event.size;
-                memcpy (m.buffer, event.buffer, MAX(sizeof(m.buffer), event.size));
-                jack_ringbuffer_write (rb, (void *) &m, sizeof(midimsg)); }
-#endif
             continue; }
 
         continue; }
