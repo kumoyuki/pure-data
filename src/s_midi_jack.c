@@ -205,6 +205,24 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
 
 void jack_close_midi(void)
 {
+    if(j_client != 0) {
+        fprintf(stderr, "jack_close_midi: client %s(%p)\n", jack_get_client_name(j_client), j_client);
+        for(size_t p=0; p < jm_inport_count; p++)
+            if(jm_inports[p] != 0) {
+                fprintf(stderr, "jack_close_midi: closing inport %s\n",
+                        jack_port_name(jm_inports[p]));
+                jack_port_unregister(j_client, jm_inports[p]); }
+        
+        for(size_t p=0; p < jm_outport_count; p++)
+            if(jm_outports[p] != 0) {
+                fprintf(stderr, "jack_close_midi: closing outport %s\n",
+                        jack_port_name(jm_outports[p]));
+                jack_port_unregister(j_client, jm_outports[p]); }
+        
+        jack_client_close(j_client);
+        j_client = 0; }
+        
+    return;
 }
 
 void jack_putmidimess(int portno, int a, int b, int c)
@@ -217,6 +235,9 @@ void jack_putmidibyte(int portno, int byte)
 
 void jack_poll_midi(void)
 {
+    // this is called by the midi loop, sys_pollmidiqueue, for midi input.
+    // JACK kinda doesn't need it. But maybe we should have an implementation
+    // here to use when we are not in callbacks mode
 }
 
 void jack_midi_getdevs(

@@ -27,6 +27,7 @@ void sys_putmidibyte(int portno, int byte) {
 
 
 void sys_poll_midi(void) {
+    // this is called by the midi loop, sys_pollmidiqueue, for midi input.
     if(midi_system != 0)
         (*midi_system->mp_poll_midi)();
     return; }
