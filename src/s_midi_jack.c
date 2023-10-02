@@ -151,6 +151,9 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
     for(size_t i=0; i < jm_inport_count; i++) {
         jack_port_t* port = jm_inports[i];
+        if(port == 0)
+            continue;
+        
         char const* name = jack_port_name(port);
         if(name == 0) {
             fprintf(stderr, "failed to get port name for %zd, %p\n", i, port);
