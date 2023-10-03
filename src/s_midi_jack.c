@@ -120,7 +120,7 @@ void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** na
 jack_client_t* jm_get_client() {
     if(j_client != 0)
         return j_client;
-
+    
     j_client = jack_client_open(JACK_MIDI_CLIENT_NAME, JackNoStartServer, NULL);
     if(j_client == 0) {
         fprintf(stderr, "jm_get_client: could not start jack connection\n");
@@ -128,7 +128,11 @@ jack_client_t* jm_get_client() {
     else
         fprintf(stderr, "j_client = %p, name=%s\n", j_client, jack_get_client_name(j_client));
 
-    jack_set_process_callback(j_client, jack_process_midi, NULL);
+    t_audiosettings as;
+    sys_get_audio_settings(&as);
+    if(as.a_callback)
+        jack_set_process_callback(j_client, jack_process_midi, NULL);
+    
     int rc = jack_activate(j_client);
 //    fprintf(stderr, "jack_activate -> rc=%d\n", rc);
 
@@ -180,7 +184,7 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
     int rc = 0;
     char* client_name = 0;
     char const* port_name = 0;
-    
+
     fprintf(stderr, "jack_do_open_midi %s client=%p, n_midi_in=%d, n_midi_out=%d\n",
             jack_get_version_string(), jack_client, nmidiin, nmidiout);
 
@@ -225,12 +229,19 @@ void jack_close_midi(void)
     return;
 }
 
+
 void jack_putmidimess(int portno, int a, int b, int c)
 {
+    fprintf(stderr, "jack_putmidimess: port=%d, %02x %02x %02x\n",
+            portno, a, b, c);
+    return;
 }
+
 
 void jack_putmidibyte(int portno, int byte)
 {
+    fprintf(stderr, "jack_putmidibyte: port=%d, %02x\n", portno, byte);
+    return;
 }
 
 void jack_poll_midi(void)
@@ -238,6 +249,13 @@ void jack_poll_midi(void)
     // this is called by the midi loop, sys_pollmidiqueue, for midi input.
     // JACK kinda doesn't need it. But maybe we should have an implementation
     // here to use when we are not in callbacks mode
+    t_audiosettings as;
+    sys_get_audio_settings(&as);
+    if(as.a_callback)
+        return;
+
+    jack_process_midi(1024, 0);
+    return;
 }
 
 void jack_midi_getdevs(
