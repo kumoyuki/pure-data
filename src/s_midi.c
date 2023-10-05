@@ -283,6 +283,7 @@ void inmidi_polyaftertouch(int portno, int channel, int pitch, int value);
 
 static void sys_dispatchnextmidiin(void)
 {
+    static unsigned long long sequence = 0;
     static t_midiparser parser[MAXMIDIINDEV], *parserp;
     int portno = midi_inqueue[midi_intail].q_portno,
         byte = midi_inqueue[midi_intail].q_byte1;

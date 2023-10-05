@@ -152,7 +152,8 @@ char const** jm_get_ports(enum JackPortFlags pf) {
 
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     // the void is user data, of which we have none
-
+    static unsigned long long sequence = 0;
+    
     for(size_t i=0; i < jm_inport_count; i++) {
         jack_port_t* port = jm_inports[i];
         if(port == 0)
@@ -165,15 +166,24 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         void* pb = jack_port_get_buffer(port, n_frames);
 
-        jack_nframes_t ic = jack_midi_get_event_count(pb);        
-        for(int e = 0; e < ic; e++) {
-            jack_midi_event_t event;
-
-            int r = jack_midi_event_get (&event, pb, e);
-            for(size_t s=0; r==0 && s<event.size; s++)
-                sys_midibytein(i, event.buffer[s]);
-            
-            continue; }
+        jack_nframes_t ic = jack_midi_get_event_count(pb);
+        if(ic > 0) {
+            fprintf(stderr, "jack_process_midi: port %zd, %d events\n", i, ic);
+            for(int e = 0; e < ic; e++) {
+                jack_midi_event_t event;
+                
+                int r = jack_midi_event_get (&event, pb, e);
+                if(r == 0) {
+                    sequence += 1;
+                    fprintf(stderr, "jack_process_midi: event %lld (%d bytes) = ",
+                            sequence, event.size);
+                    for(size_t s=0; r==0 && s<event.size; s++) {
+                        fprintf(stderr, "%02x", event.buffer[s]);
+                        sys_midibytein(i, event.buffer[s]);
+                        continue; }
+                    fprintf(stderr, "\n");
+                
+                    continue; }}}
 
         continue; }
     
