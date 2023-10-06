@@ -9,6 +9,14 @@
 
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+
+#ifndef SYS_gettid
+#error "SYS_gettid unavailable on this system"
+#endif
+
+#define gettid() ((pid_t)syscall(SYS_gettid))
 
 /* PD appears to have its own, nominally JACK-compatible ringbuffers
 #include "jack/ringbuffer.h"
@@ -150,9 +158,77 @@ char const** jm_get_ports(enum JackPortFlags pf) {
         jack_get_ports(j_client, NULL, JACK_DEFAULT_MIDI_TYPE, pf); }
 
 
+char const* jm_print_event(
+    char* buffer, size_t bsz, jack_midi_event_t* e,
+    char const* lb, char const* rb) {
+    size_t rbz = strlen(rb);
+    
+    char header[128];
+    sprintf(header, "%s%ld, ", lb, e->time);
+    
+    size_t hsz = strlen(header);
+    if(hsz + rbz >= bsz) {
+        strncpy(buffer, header, bsz-1);
+        return buffer; }
+    
+    sprintf(buffer, "%s", header);
+    size_t rsz = bsz - hsz - rbz;
+    if(rsz < 2)
+        return buffer;
+    
+    char* cursor = buffer + strlen(buffer);
+    size_t byte = 0;
+    while(byte < e->size && cursor < (buffer + bsz - rbz - 3)) {
+        sprintf(cursor, "%02x", e->buffer[byte]);
+        byte += 1;
+        cursor += 2; }
+                                    
+    if(cursor < buffer + bsz - rbz - 1)
+        sprintf(cursor, "%s", rb);
+    
+    return buffer; }
+    
+        
+int jm_same_event(jack_midi_event_t* e1, jack_midi_event_t* e2) {
+    char e1b[1024];
+    jm_print_event(e1b, 1023, e1, "<", "|");
+    char e2b[1024];
+    jm_print_event(e2b, 1023, e2, "|", ">");
+    fprintf(stderr, "jse: %s%s\n", e1b, e2b);
+    return e1->size == e2->size
+        && memcmp(e1->buffer, e2->buffer, e1->size) == 0
+        && e1->time == e2->time
+        ; }
+
+
+static unsigned long long jm_sequence = 0;
+static jack_midi_event_t jm_last_event;
+static char* jm_last_event_buffer = 0;
+static size_t jm_last_event_buffer_size = 0;
+static char jm_lb[1024];
+
+void jm_set_last_event(jack_midi_event_t* e) {
+    char this[1024];
+    char was[1024];
+    jm_print_event(was, 1023, &jm_last_event, "<", ">");
+    jm_print_event(this, 1023, e, "<", ">");
+    fprintf(stderr, "jm_set_last_event: %s <- %s\n", was, this);
+
+    jm_sequence += 1;
+    jm_last_event = *e;
+    
+    if(jm_last_event_buffer_size <= e->size) {
+        jm_last_event_buffer_size = e->size * 2;
+        jm_last_event_buffer = realloc(jm_last_event_buffer, jm_last_event_buffer_size);
+        jm_last_event.buffer = jm_last_event_buffer; }
+
+    memcpy(jm_last_event.buffer, e->buffer, e->size);
+
+    return; }
+    
+    
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     // the void is user data, of which we have none
-    static unsigned long long sequence = 0;
     
     for(size_t i=0; i < jm_inport_count; i++) {
         jack_port_t* port = jm_inports[i];
@@ -168,22 +244,31 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0) {
-            fprintf(stderr, "jack_process_midi: port %zd, %d events\n", i, ic);
+            pid_t tid = gettid();
+            jm_print_event(jm_lb, 1023, &jm_last_event, "<",">");
+            fprintf(stderr, "jack_process_midi<%d>: port %zd, %d events last=%s\n", tid, i, ic, jm_lb);
             for(int e = 0; e < ic; e++) {
                 jack_midi_event_t event;
                 
                 int r = jack_midi_event_get (&event, pb, e);
                 if(r == 0) {
-                    sequence += 1;
-                    fprintf(stderr, "jack_process_midi: event %lld (%d bytes) = ",
-                            sequence, event.size);
-                    for(size_t s=0; r==0 && s<event.size; s++) {
-                        fprintf(stderr, "%02x", event.buffer[s]);
-                        sys_midibytein(i, event.buffer[s]);
-                        continue; }
-                    fprintf(stderr, "\n");
-                
-                    continue; }}}
+                    int is_same = jm_same_event(&jm_last_event, &event);
+                    if(jm_sequence == 0 || !is_same) {
+                        char ebuf[1024];
+                        char const* wbuf = jm_print_event(ebuf, 1023, &event, "<", ">");
+                        fprintf(stderr, "jack_process_midi<%d>: event %lld %s\n",
+                                tid, jm_sequence, wbuf);
+                        
+                        for(size_t s=0; s < event.size; s++)
+                            sys_midibytein(i, event.buffer[s]);
+                        
+                        jm_set_last_event(&event); }
+                    else
+                        fprintf(stderr, "is_same = %d\n", is_same); }
+                else
+                    fprintf(stderr, "whoopsie\n");
+
+                continue; }}
 
         continue; }
     
