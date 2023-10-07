@@ -203,7 +203,7 @@ int jm_same_event(jack_midi_event_t* e1, jack_midi_event_t* e2) {
 
 static unsigned long long jm_sequence = 0;
 static jack_midi_event_t jm_last_event;
-static char* jm_last_event_buffer = 0;
+static char *jm_last_event_buffer;
 static size_t jm_last_event_buffer_size = 0;
 static char jm_lb[1024];
 
@@ -215,7 +215,8 @@ void jm_set_last_event(jack_midi_event_t* e) {
     fprintf(stderr, "jm_set_last_event: %s <- %s\n", was, this);
 
     jm_sequence += 1;
-    jm_last_event = *e;
+    jm_last_event.time = e->time;
+    jm_last_event.size = e->size;
     
     if(jm_last_event_buffer_size <= e->size) {
         jm_last_event_buffer_size = e->size * 2;
@@ -246,7 +247,8 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
         if(ic > 0) {
             pid_t tid = gettid();
             jm_print_event(jm_lb, 1023, &jm_last_event, "<",">");
-            fprintf(stderr, "jack_process_midi<%d>: port %zd, %d events last=%s\n", tid, i, ic, jm_lb);
+            fprintf(stderr, "jack_process_midi<%d>: port %zd, %d events last=%s\n",
+                    tid, i, ic, jm_lb);
             for(int e = 0; e < ic; e++) {
                 jack_midi_event_t event;
                 
