@@ -5,10 +5,14 @@
  */
 
 #include "s_jack.h"
+#include "z_ringbuffer.h"
+
 #include "jack/midiport.h"
 
 #include <errno.h>
 #include <string.h>
+#include <stdatomic.h>
+
 #include <unistd.h>
 #include <sys/syscall.h>
 
@@ -33,9 +37,6 @@ extern int sys_midioutdevlist[]; // index into list used for drop down
 #define JACK_MIDI_CLIENT_NAME "pd-midi"
 
 static jack_client_t* j_client = 0;
-static jack_port_t* j_port = 0;
-static sys_ringbuf* j_buffer_size = 0;
-static sys_ringbuf* j_buffer_message = 0;
 static jack_time_t j_last_time;
 
 // midi ports in the global environment
@@ -51,10 +52,12 @@ static jack_port_t** jm_inports;
 static size_t jm_outport_count = 0;
 static size_t jm_outport_using = 0;
 static jack_port_t** jm_outports;
+static ring_buffer* jm_byte_queue = 0;
 
 static jack_port_t* jm_create_port(char const* name, unsigned long flags);
 static void jm_resize_ports(unsigned long flags, int nmidi);
 static int jack_process_midi(jack_nframes_t n_frames, void* j);
+static int jack_has_events(jack_nframes_t n_frames, void* j);
 
 
 void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** names) {
@@ -142,6 +145,8 @@ jack_client_t* jm_get_client() {
     sys_get_audio_settings(&as);
     if(as.a_callback)
         jack_set_process_callback(j_client, jack_process_midi, NULL);
+    else
+        jack_set_process_callback(j_client, jack_has_events, NULL);
     
     int rc = jack_activate(j_client);
 //    fprintf(stderr, "jack_activate -> rc=%d\n", rc);
@@ -220,6 +225,9 @@ static jack_midi_event_t jm_last_event;
 static char *jm_last_event_buffer;
 static size_t jm_last_event_buffer_size = 0;
 static char jm_lb[1024];
+static _Atomic int jm_pending_count = 0;
+static _Atomic int jm_is_polling = 0;
+
 
 void jm_set_last_event(jack_midi_event_t* e) {
     char this[1024];
@@ -244,10 +252,20 @@ void jm_set_last_event(jack_midi_event_t* e) {
 
 static uint64_t jpm_tick = 0;
 
+static int jack_has_events(jack_nframes_t n, void* j) {
+    jpm_tick += 1;
+    while(atomic_load(&jm_is_polling));
+    atomic_store(&jm_pending_count, n);
+    return 0; }
+
+
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     // the void is user data, of which we have none
     jpm_tick += 1;
-    
+
+    t_audiosettings as;
+    sys_get_audio_settings(&as);
+
     for(size_t i=0; i < jm_inport_using; i++) {
         jack_port_t* port = jm_inports[i];
         if(port == 0)
@@ -277,9 +295,15 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
                         char const* wbuf = jm_print_event(ebuf, 1023, &event, "<", ">");
                         fprintf(stderr, "jack_process_midi<%d>: event %lld %s\n",
                                 tid, jm_sequence, wbuf);
-                        
-                        for(size_t s=0; s < event.size; s++)
-                            sys_midibytein(i, event.buffer[s]);
+
+                        if(!as.a_callback)
+                            for(size_t s=0; s < event.size; s++)
+                                sys_midibytein(i, event.buffer[s]);
+                        else {
+                            int avail = rb_available_to_write(jm_byte_queue);
+                            if(avail > event.size)
+                                rb_write_to_buffer(jm_byte_queue, 1, event.buffer);
+                            else
                         
                         jm_set_last_event(&event); }
                     else
@@ -368,7 +392,17 @@ void jack_poll_midi(void)
     if(as.a_callback)
         return;
 
-    jack_process_midi(1024, 0);
+    // need a ringbuffer per open port, methinks (ugh). Or an encoded byte stream (ick)
+    char buffer[4096];
+    for(int ready = rb_available_to_read(jm_byte_queue);
+        ready > 0;
+        ready = rb_available_to_read(jm_byte_queue)) {
+        int read = ready < 4096 ?ready :4096;
+        rb_read_from_buffer(jm_byte_queue, buffer, read);
+        for(int i=0; i<read; i++)
+            sys_midibytein(0, buffer[i]);
+        continue; }
+    
     return;
 }
 
@@ -414,10 +448,10 @@ void jack_midi_getdevs(
 static void jack_midi_init() {
     fprintf(stderr, "jack_midi_init\n");
     j_client = 0;
-    j_port = 0;
-    j_buffer_size = 0;
-    j_buffer_message = 0;
 
+    if(jm_byte_queue == 0)
+        jm_byte_queue = rb_create(JACK_RINGBUFFER_SIZE);
+    
     return; }
 
 
