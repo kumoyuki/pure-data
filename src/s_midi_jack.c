@@ -355,8 +355,13 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
                             jm_midi_in(i, &event);
                         else {
                             int avail = rb_available_to_write(jmp->buffer);
-                            if(avail > event.size)
-                                rb_write_to_buffer(jmp->buffer, 1, event.buffer);
+                            if(avail > event.size) {
+                                // this may fix (or at least flag) the lossage that
+                                // happens while running in polling mode
+                                int ec = rb_write_to_buffer(jmp->buffer, 1, event.buffer, event.size);
+                                if(ec < 0) {
+                                    pd_error(0, "JACK MIDI: failed to write to ringbuffer");
+                                    break; }}
                             else
                                 pd_error(0, "JACK MIDI: input ringbuffer overrun"); }
                         
