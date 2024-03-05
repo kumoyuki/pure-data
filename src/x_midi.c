@@ -5,6 +5,15 @@
 /* MIDI. */
 
 #include "m_pd.h"
+#include "unistd.h"
+#include <sys/syscall.h>
+
+#ifndef SYS_gettid
+#error "SYS_gettid unavailable on this system"
+#endif
+
+#define gettid() ((pid_t)syscall(SYS_gettid))
+
 void outmidi_noteon(int portno, int channel, int pitch, int velo);
 void outmidi_controlchange(int portno, int channel, int ctlno, int value);
 void outmidi_programchange(int portno, int channel, int value);
@@ -86,6 +95,8 @@ static void midiin_setup(void)
     class_sethelpsymbol(sysexin_class, gensym("midi"));
 }
 
+static unsigned long long inmidi_sequence = 0;
+
 void inmidi_byte(int portno, int byte)
 {
     t_atom at[2];
@@ -166,6 +177,7 @@ static void notein_setup(void)
 
 void inmidi_noteon(int portno, int channel, int pitch, int velo)
 {
+    fprintf(stderr, "inmidi_noteon<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_notein_sym->s_thing)
     {
         t_atom at[3];
@@ -237,6 +249,7 @@ static void ctlin_setup(void)
 
 void inmidi_controlchange(int portno, int channel, int ctlnumber, int value)
 {
+    fprintf(stderr, "inmidi_controlchange>%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_ctlin_sym->s_thing)
     {
         t_atom at[3];
@@ -301,6 +314,7 @@ static void pgmin_setup(void)
 
 void inmidi_programchange(int portno, int channel, int value)
 {
+    fprintf(stderr, "inmidi_programchange<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_pgmin_sym->s_thing)
     {
         t_atom at[2];
@@ -363,6 +377,7 @@ static void bendin_setup(void)
 
 void inmidi_pitchbend(int portno, int channel, int value)
 {
+    fprintf(stderr, "inmidi_pitchbend<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_bendin_sym->s_thing)
     {
         t_atom at[2];
@@ -426,6 +441,7 @@ static void touchin_setup(void)
 
 void inmidi_aftertouch(int portno, int channel, int value)
 {
+    fprintf(stderr, "inmidi_aftertouch<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_touchin_sym->s_thing)
     {
         t_atom at[2];
@@ -495,6 +511,7 @@ static void polytouchin_setup(void)
 
 void inmidi_polyaftertouch(int portno, int channel, int pitch, int value)
 {
+    fprintf(stderr, "inmidi_polyaftertouch<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_polytouchin_sym->s_thing)
     {
         t_atom at[3];
@@ -551,6 +568,7 @@ static void midirealtimein_setup(void)
 
 void inmidi_realtimein(int portno, int SysMsg)
 {
+    fprintf(stderr, "inmidi_realtimein<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
     if (pd_this->pd_midi->m_midirealtimein_sym->s_thing)
     {
         t_atom at[2];

@@ -10,6 +10,8 @@ in future releases.  The public (stable) API is in m_pd.h. */
 
 /* in s_path.c */
 
+struct midi_plugin;
+
 typedef struct _namelist    /* element in a linked list of stored strings */
 {
     struct _namelist *nl_next;  /* next in list */
@@ -186,6 +188,12 @@ void oss_reportidle(void);
 void oss_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int *canmulti,
         int maxndev, int devdescsize);
+struct midi_plugin* ossmidi_get_plugin();
+#ifdef USEAPI_OSS
+#define MIDIAPI_OSS 1
+#else
+#define MIDIAPI_OSS 0
+#endif
 
 int alsa_open_audio(int naudioindev, int *audioindev, int nchindev,
     int *chindev, int naudiooutdev, int *audiooutdev, int nchoutdev,
@@ -196,6 +204,12 @@ void alsa_reportidle(void);
 void alsa_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int *canmulti,
         int maxndev, int devdescsize);
+struct midi_plugin* alsamidi_get_plugin();
+#ifdef USEAPI_ALSA
+#define MIDIAPI_ALSA 1
+#else
+#define MIDIAPI_ALSA 0
+#endif
 
 int jack_open_audio(int inchans, int outchans, t_audiocallback callback);
 void jack_close_audio(void);
@@ -207,6 +221,17 @@ void jack_getdevs(char *indevlist, int *nindevs,
 void jack_listdevs(void);
 void jack_client_name(const char *name);
 void jack_autoconnect(int);
+struct midi_plugin* jackmidi_get_plugin();
+#ifdef USEAPI_JACK
+#include <jack/jack.h>
+#define MIDIAPI_JACK 1
+
+void jackmidi_process(jack_nframes_t nf, void* j);
+#else
+#define MIDIAPI_JACK 0
+#endif
+
+#define MIDI_N_APIS (MIDIAPI_ALSA + MIDIAPI_OSS + MIDIAPI_JACK)
 
 int mmio_open_audio(int naudioindev, int *audioindev,
     int nchindev, int *chindev, int naudiooutdev, int *audiooutdev,
@@ -246,6 +271,8 @@ void dummy_getdevs(char *indevlist, int *nindevs, char *outdevlist,
 void dummy_listdevs(void);
 
                     /* s_midi.c */
+#define USE_LOCAL_MIDI 1
+
 #define MAXMIDIINDEV 16         /* max. number of input ports */
 #define MAXMIDIOUTDEV 16        /* max. number of output ports */
 extern int sys_midiapi;

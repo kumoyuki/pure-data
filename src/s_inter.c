@@ -1475,6 +1475,7 @@ void sys_setrealtime(const char *libdir)
     }
     if (sys_hipriority)
     {
+#if 0
         int pipe9[2], watchpid;
             /* To prevent lockup, we fork off a watchdog process with
             higher real-time priority than ours.  The GUI has to send
@@ -1528,6 +1529,7 @@ void sys_setrealtime(const char *libdir)
                 /* We also have to start the ping loop in the GUI;
                 this is done later when the socket is open. */
         }
+#endif
     }
     else logpost(NULL, PD_VERBOSE, "not setting real-time priority");
 #endif /* __linux__ */

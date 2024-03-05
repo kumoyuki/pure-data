@@ -5,6 +5,8 @@
 
 /* MIDI I/O for Linux using OSS */
 
+#include "s_midi_plugin.h"
+
 #include <stdio.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -14,8 +16,6 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-#include "m_pd.h"
-#include "s_stuff.h"
 
 #define MAXNDEV 10
 static int oss_nmididevs;
@@ -62,7 +62,7 @@ static void oss_midiout(int fd, int n)
 
 #define O_MIDIFLAG O_NDELAY
 
-void sys_do_open_midi(int nmidiin, int *midiinvec,
+static void oss_do_open_midi(int nmidiin, int *midiinvec,
     int nmidiout, int *midioutvec)
 {
     int i;
@@ -132,7 +132,7 @@ void sys_do_open_midi(int nmidiin, int *midiinvec,
 #define md_msglen(x) (((x)<0xC0)?2:((x)<0xE0)?1:((x)<0xF0)?2:\
     ((x)==0xF2)?2:((x)<0xF4)?1:0)
 
-void sys_putmidimess(int portno, int a, int b, int c)
+static void oss_putmidimess(int portno, int a, int b, int c)
 {
     if (portno >= 0 && portno < oss_nmidiout)
     {
@@ -154,13 +154,13 @@ void sys_putmidimess(int portno, int a, int b, int c)
     }
 }
 
-void sys_putmidibyte(int portno, int byte)
+static void oss_putmidibyte(int portno, int byte)
 {
     if (portno >= 0 && portno < oss_nmidiout)
         oss_midiout(oss_midioutfd[portno], byte);
 }
 
-void sys_poll_midi(void)
+static void oss_poll_midi(void)
 {
     int i, throttle = 100;
     int did = 1, maxfd = 0;
@@ -192,7 +192,7 @@ void sys_poll_midi(void)
     }
 }
 
-void sys_close_midi()
+static void oss_close_midi()
 {
     int i;
     for (i = 0; i < oss_nmidiin; i++)
@@ -222,7 +222,7 @@ void midi_oss_init(void)
     }
 }
 
-void midi_getdevs(char *indevlist, int *nindevs,
+static void oss_midi_getdevs(char *indevlist, int *nindevs,
     char *outdevlist, int *noutdevs, int maxndev, int devdescsize)
 {
     int i, ndev;
@@ -240,4 +240,29 @@ void midi_getdevs(char *indevlist, int *nindevs,
         strcpy(outdevlist + i * devdescsize,
             oss_midinames[i]);
     *noutdevs = ndev;
+}
+
+
+static void oss_midi_save(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev) {
+    /* apparently sys_save_midi_params() is adequate. For now (pre-JACK). may need
+     * to move its guts in here
+     */
+    return; }
+
+
+struct midi_plugin* ossmidi_get_plugin() {
+    static struct midi_plugin oss = {
+        "oss-midi", // should be API_DEFAULTMIDI?
+        midi_oss_init,
+        oss_do_open_midi,
+        oss_close_midi,
+        oss_putmidimess,
+        oss_putmidibyte,
+        oss_poll_midi,
+        oss_midi_getdevs,
+        oss_midi_save
+    };
+
+    fprintf(stderr, "getting oss midi plugin: %p\n", &oss);
+    return &oss;
 }

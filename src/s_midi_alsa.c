@@ -5,13 +5,13 @@
 
 /* MIDI I/O for Linux using ALSA */
 
+#include "s_midi_plugin.h"
+
 #include <stdio.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #include <alsa/asoundlib.h>
-#include "m_pd.h"
-#include "s_stuff.h"
 
 /* full status byte definitions in s_midi.c */
 /* channel voice messages */
@@ -280,4 +280,37 @@ void midi_alsa_getdevs(char *indevlist, int *nindevs,
     for (i = 0; i < ndev; i++)
         sprintf(outdevlist + i * devdescsize, "ALSA MIDI device #%d", i+1);
     *noutdevs = ndev;
+}
+
+
+static void midi_alsa_save(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev) {
+    /* invent a story so that saving/recalling "settings" will
+     * be able to restore the number of devices.  ALSA MIDI handling
+     * uses its own set of variables.  LATER figure out how to get
+     * this to work coherently
+     */
+    for (size_t i = 0; i < nmidiindev; i++)
+        midiindev[i] = i;
+    
+    for (size_t i = 0; i < nmidioutdev; i++)
+        midioutdev[i] = i;
+
+    return; }
+
+
+struct midi_plugin* alsamidi_get_plugin() {
+    static struct midi_plugin alsa = {
+        "alsa-midi",
+        midi_alsa_init,
+        sys_alsa_do_open_midi,
+        sys_alsa_close_midi,
+        sys_alsa_putmidimess,
+        sys_alsa_putmidibyte,
+        sys_alsa_poll_midi,
+        midi_alsa_getdevs,
+        midi_alsa_save
+    };
+
+    fprintf(stderr, "getting alsa midi plugin: %p\n", &alsa);
+    return &alsa;
 }

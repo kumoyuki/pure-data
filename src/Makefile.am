@@ -174,11 +174,13 @@ pd_SOURCES_core = \
     x_vexp.c \
     x_vexp_fun.c \
     x_vexp_if.c \
+    z_ringbuffer.c \
     $(empty)
 
 pd_SOURCES_standalone = \
     s_file.c \
     s_midi.c \
+    s_midi_plugin.c \
     $(empty)
 
 # pd-watchdog and "local" pd symlink location for tcl scripts
@@ -231,7 +233,7 @@ endif
 # TODO support Jack xrun
 if JACK
 pd_CFLAGS += -DUSEAPI_JACK -DJACK_XRUN @JACK_CFLAGS@
-pd_SOURCES_standalone += s_audio_jack.c
+pd_SOURCES_standalone += s_audio_jack.c s_midi_jack.c
 
 if JACK_FRAMEWORK
 # link to Jackmp.framework on macOS
