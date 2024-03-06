@@ -23,13 +23,13 @@
  * `JACK_CLIENT_NAME_SIZE` definitions I could find in the wild. */
 #define CLIENT_NAME_SIZE_FALLBACK 128
 
-static jack_nframes_t jack_out_max;
-static jack_nframes_t jack_filled = 0;
-static int jack_started = 0;
-static jack_port_t *input_port[MAX_JACK_PORTS];
-static jack_port_t *output_port[MAX_JACK_PORTS];
-static jack_client_t *jack_client = NULL;
-static char * desired_client_name = NULL;
+jack_nframes_t jack_out_max;
+jack_nframes_t jack_filled = 0;
+int jack_started = 0;
+jack_port_t *input_port[MAX_JACK_PORTS];
+jack_port_t *output_port[MAX_JACK_PORTS];
+jack_client_t *jack_client = NULL;
+char * desired_client_name = NULL;
 
 char *jack_client_names[MAX_CLIENTS];
 int jack_dio_error;
