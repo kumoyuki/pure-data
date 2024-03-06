@@ -167,9 +167,17 @@ void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** na
             ps->ports[n]->port = port;
             ps->using += 1;
 
-            fprintf(stderr, "jack_connect %s %s(%p) -> %s(%p), rc=%d, errno=%d \"%s\"\n",
-                    side, names[port_number], remote, name, rc,
-                    errno, strerror(errno)); }
+            if(rc == 0)
+                fprintf(stderr, "jack_connect %s %s(%p) -> %s, rc=%d, errno=%d \"%s\"\n",
+                        side,
+                        names[port_number], remote,
+                        name);
+            else
+                fprintf(stderr, "jack_connect %s %s(%p) -> %s, rc=%d, errno=%d \"%s\"\n",
+                        side,
+                        names[port_number], remote,
+                        name,
+                        rc, errno, strerror(errno)); }
         else
             fprintf(stderr, "failed to register port %s\n", name);
         
@@ -234,7 +242,7 @@ char const* jm_print_event(
     
     sprintf(buffer, "%s", header);
     size_t rsz = bsz - hsz - rbz;
-    if(rsz < 2)
+    if(rsz < 2) // a bit messy, should copy in rb and check appropriately
         return buffer;
     
     char* cursor = buffer + strlen(buffer);
@@ -264,10 +272,10 @@ struct jm_ports* jm_resize_ports(unsigned long flags, int nmidi) {
     
 int jm_same_event(jack_midi_event_t* e1, jack_midi_event_t* e2) {
     char e1b[1024];
-    jm_print_event(e1b, 1023, e1, "<", "|");
+//    jm_print_event(e1b, 1023, e1, "<", "|");
     char e2b[1024];
-    jm_print_event(e2b, 1023, e2, "|", ">");
-    // fprintf(stderr, "jse: %s%s\n", e1b, e2b);
+//    jm_print_event(e2b, 1023, e2, "|", ">");
+//    fprintf(stderr, "jse: %s%s\n", e1b, e2b);
     return e1->size == e2->size
         && memcmp(e1->buffer, e2->buffer, e1->size) == 0
         && e1->time == e2->time
@@ -286,21 +294,23 @@ static _Atomic int jm_is_polling = 0;
 void jm_set_last_event(jack_midi_event_t* e) {
     char this[1024];
     char was[1024];
-    jm_print_event(was, 1023, &jm_last_event, "<", ">");
-    jm_print_event(this, 1023, e, "<", ">");
-    //fprintf(stderr, "jm_set_last_event: %s <- %s\n", was, this);
+//    jm_print_event(was, 1023, &jm_last_event, "<", ">");
+//    jm_print_event(this, 1023, e, "<", ">");
+//    fprintf(stderr, "jm_set_last_event: %s <- %s\n", was, this);
 
     jm_sequence += 1;
     jm_last_event.time = e->time;
     jm_last_event.size = e->size;
-    
+
+    fprintf(stderr, "jm_set_last_event: seq=%ld, jm_last_event_buffer_size=%zd\n", jm_sequence, jm_last_event_buffer_size);
     if(jm_last_event_buffer_size <= e->size) {
         jm_last_event_buffer_size = e->size * 2;
         jm_last_event_buffer = realloc(jm_last_event_buffer, jm_last_event_buffer_size);
         jm_last_event.buffer = jm_last_event_buffer; }
 
+    fprintf(stderr, "jm_set_last_event: about to memcpy: seq=%ld, jm_last_event_buffer_size=%zd\n", jm_sequence, jm_last_event_buffer_size);
     memcpy(jm_last_event.buffer, e->buffer, e->size);
-
+    fprintf(stderr, "jm_set_last_event: copied\n");
     return; }
     
 
@@ -336,7 +346,7 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0) {
             pid_t tid = gettid();
-            jm_print_event(jm_lb, 1023, &jm_last_event, "<",">");
+//            jm_print_event(jm_lb, 1023, &jm_last_event, "<",">");
 //            fprintf(stderr, "jack_process_midi<%d/%lld>: port %zd, %d events last=%s\n",
 //                    tid, jpm_tick, i, ic, jm_lb);
             for(int e = 0; e < ic; e++) {
@@ -347,7 +357,7 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
                     int is_same = jm_same_event(&jm_last_event, &event);
                     if(jm_sequence == 0 || !is_same) {
                         char ebuf[1024];
-                        char const* wbuf = jm_print_event(ebuf, 1023, &event, "<", ">");
+//                        char const* wbuf = jm_print_event(ebuf, 1023, &event, "<", ">");
 //                        fprintf(stderr, "jack_process_midi<%d>: event %lld %s\n",
 //                                tid, jm_sequence, wbuf);
 
@@ -409,7 +419,7 @@ void jack_do_open_midi(int nmidiin, int *midiinvec, int nmidiout, int *midioutve
 void jack_close_midi(void)
 {
     if(j_client != 0) {
-        fprintf(stderr, "jack_close_midi: client %s(%p)\n", jack_get_client_name(j_client), j_client);
+//        fprintf(stderr, "jack_close_midi: client %s(%p)\n", jack_get_client_name(j_client), j_client);
         for(size_t p = 0; p < inports.using; p++)
             if(inports.ports[p] != 0) {
                 fprintf(stderr, "jack_close_midi: closing inport %s\n",
@@ -497,7 +507,7 @@ void jack_midi_getdevs(
     int use_devs = 0;
 
     j_client = jm_get_client();
-    fprintf(stderr, "jack_midi_getdevs: client %p reading available midi ports...\n", j_client);
+    // fprintf(stderr, "jack_midi_getdevs: client %p reading available midi ports...\n", j_client);
     if(j_client == 0)
         return;
     
