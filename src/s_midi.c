@@ -514,7 +514,7 @@ void sys_get_midi_apis(char *buf)
 #endif
 #ifdef USEAPI_JACK
     midi_plugins[n] = jackmidi_get_plugin();
-    fprintf(stderr, "jack plugin: %p\n", midi_plugins[n]);
+//    fprintf(stderr, "jack plugin: %p\n", midi_plugins[n]);
     sprintf(buf + strlen(buf), "{%s %d} ", midi_plugins[n]->mp_name, API_JACK); n++;
 #endif
     strcat(buf, "}");
@@ -569,10 +569,10 @@ static void sys_save_midi_params(
 void sys_open_midi(int nmidiindev, int *midiindev,
     int nmidioutdev, int *midioutdev, int enable)
 {
-    fprintf(stderr,
-            "sys_open_midi %s, api=%d enable=%d, n-indevs=%d, n-outdevs=%d\n",
-            midi_system->mp_name, sys_midiapi,
-            enable, nmidiindev, nmidioutdev);
+//    fprintf(stderr,
+//            "sys_open_midi %s, api=%d enable=%d, n-indevs=%d, n-outdevs=%d\n",
+//            midi_system->mp_name, sys_midiapi,
+//            enable, nmidiindev, nmidioutdev);
     
     if (enable)
     {
@@ -621,7 +621,7 @@ void sys_listmididevs(void)
 
 void sys_set_midi_api(int which)
 {
-    fprintf(stderr, "sys_set_midi_api, which=%d\n", which);
+//    fprintf(stderr, "sys_set_midi_api, which=%d\n", which);
     switch (which) {
 #ifdef USEAPI_ALSA
     case(API_ALSA):
