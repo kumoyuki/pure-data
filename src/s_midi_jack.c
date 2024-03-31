@@ -168,14 +168,15 @@ void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** na
             ps->using += 1;
 
             if(rc == 0)
-                fprintf(stderr, "jack_connect %s %s(%p) -> %s, rc=%d, errno=%d \"%s\"\n",
+                fprintf(stderr, "jack_connect %s %s -> %s, rc=%d\n",
                         side,
-                        names[port_number], remote,
-                        name);
+                        names[port_number],
+                        name,
+                        rc);
             else
-                fprintf(stderr, "jack_connect %s %s(%p) -> %s, rc=%d, errno=%d \"%s\"\n",
+                fprintf(stderr, "jack_connect %s %s -> %s, rc=%d, errno=%d \"%s\"\n",
                         side,
-                        names[port_number], remote,
+                        names[port_number],
                         name,
                         rc, errno, strerror(errno)); }
         else
