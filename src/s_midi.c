@@ -69,7 +69,7 @@ int midi_outhead, midi_outtail;
 t_midiqelem midi_inqueue[MIDIQSIZE];
 int midi_inhead, midi_intail;
 static double sys_midiinittime;
-#define API_DEFAULTMIDI 0
+#define API_DEFAULTMIDI API_NONE
 
 #if (defined USEAPI_ALSA) && (defined USEAPI_MIDIDUMMY)
         /* if the only available MIDI-backend is ALSA, choose that */
@@ -622,16 +622,21 @@ void sys_listmididevs(void)
 void sys_set_midi_api(int which)
 {
 //    fprintf(stderr, "sys_set_midi_api, which=%d\n", which);
+     /* API_NONE is no good for plugin arch. do we need a dummy plugin? */
+    if(which == API_DEFAULTMIDI)
+    {
+#ifdef USEAPI_OSS        
+        which = API_OSS;
+#else
+        which = API_ALSA;
+#endif
+    }
+    
     switch (which) {
 #ifdef USEAPI_ALSA
     case(API_ALSA):
         fprintf(stderr, "sys_set_midi_api, alsa\n", which);
         midi_system = alsamidi_get_plugin();
-        break;
-#endif
-#ifndef FORCEAPI_ALSA
-    case(API_DEFAULTMIDI):
-        fprintf(stderr, "sys_set_midi_api, api_default\n", which);
         break;
 #endif
 #ifdef USEAPI_OSS
