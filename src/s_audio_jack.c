@@ -213,7 +213,7 @@ static char** jack_get_clients(void)
     int i,j;
     int num_clients = 0;
     regex_t port_regex;
-    jack_ports = jack_get_ports( jack_client, "", "", 0 );
+    jack_ports = jack_get_ports( jack_client, "", JACK_DEFAULT_AUDIO_TYPE, 0 );
     regcomp( &port_regex, "^[^:]*", REG_EXTENDED );
 
     jack_client_names[0] = NULL;
@@ -291,7 +291,7 @@ static int jack_connect_ports(char* client)
     sprintf( regex_pattern, "%s:.*", client );
 
     jack_ports = jack_get_ports( jack_client, regex_pattern,
-                                 NULL, JackPortIsOutput);
+                                 JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput);
     if (jack_ports)
     {
         for (i=0;jack_ports[i] != NULL && i < STUFF->st_inchannels;i++)
@@ -302,7 +302,7 @@ static int jack_connect_ports(char* client)
         free(jack_ports);
     }
     jack_ports = jack_get_ports( jack_client, regex_pattern,
-                                 NULL, JackPortIsInput);
+                                 JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput);
     if (jack_ports)
     {
         for (i=0;jack_ports[i] != NULL && i < STUFF->st_outchannels;i++)
