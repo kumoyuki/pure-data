@@ -303,15 +303,15 @@ void jm_set_last_event(jack_midi_event_t* e) {
     jm_last_event.time = e->time;
     jm_last_event.size = e->size;
 
-    fprintf(stderr,
-            "jm_set_last_event: seq=%ld, jm_last_event_buffer_size=%zd\n",
-            jm_sequence, jm_last_event_buffer_size);
+//    fprintf(stderr,
+//            "jm_set_last_event: seq=%ld, jm_last_event_buffer_size=%zd\n",
+//            jm_sequence, jm_last_event_buffer_size);
     if(JACK_MIDI_MAX_BUFFER <= e->size) {
-        fprintf(stderr, "jm_set_last_event: too big e->size=%zd\n", e->size*2);
+//        fprintf(stderr, "jm_set_last_event: too big e->size=%zd\n", e->size*2);
         return; }
 
     memcpy(jm_last_event.buffer, e->buffer, e->size);
-    fprintf(stderr, "jm_set_last_event: copied\n");
+//    fprintf(stderr, "jm_set_last_event: copied\n");
     return; }
     
 
