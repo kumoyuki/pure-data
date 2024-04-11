@@ -5,13 +5,16 @@
  */
 
 #include "s_jack.h"
+/* the PD ringbuffer has egregious errors in its use of atomics
 #include "z_ringbuffer.h"
+*/
 
 #include "jack/midiport.h"
 
 #include <errno.h>
 #include <string.h>
 #include <stdatomic.h>
+#include <stdarg.h>
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -22,9 +25,23 @@
 
 #define gettid() ((pid_t)syscall(SYS_gettid))
 
-/* PD appears to have its own, nominally JACK-compatible ringbuffers
 #include "jack/ringbuffer.h"
-*/
+
+/* abstracting the PD ringbuffer API */
+typedef struct jack_ringbuffer_t jmrb;
+int jmrb_available_to_read(jmrb* rb) { return jack_ringbuffer_read_space(rb); }
+int jmrb_available_to_write(jmrb* rb) { return jack_ringbuffer_write_space(rb); }
+void jmrb_clear_buffer(jmrb* rb) { jack_ringbuffer_reset(rb); } /* not thread safe w/JACK */
+void jmrb_free(jmrb* rb) { jack_ringbuffer_free(rb); }
+jmrb* jmrb_create(size_t size) { return jack_ringbuffer_create(size); }
+int jmrb_read_from_buffer(jmrb *buffer, char *dest, int len) { return jack_ringbuffer_read(rb, dest, len); }
+
+int jmrb_write_to_buffer(jmrb *buffer, int n, ...) {
+    va_args args;
+    va_start(args, n);
+    va_end(args);
+    return 0; }
+
 
 // just to remember that there exist
 extern int sys_midiapi;
@@ -32,6 +49,8 @@ extern int sys_nmidiin;          // number of devices currently configured
 extern int sys_nmidiout;         // number of devices currently configured
 extern int sys_midiindevlist[];  // index into list used for drop down
 extern int sys_midioutdevlist[]; // index into list used for drop down
+
+pthread_mutex_t jm_mutex;
 
 #define JACK_RINGBUFFER_SIZE 16384
 #define JACK_MIDI_CLIENT_NAME "pd-midi"
@@ -49,7 +68,7 @@ static char const** j_outport_names = 0; // list used in dropdown
 struct jm_port {
     unsigned long flags;
     jack_port_t* port;
-    ring_buffer* buffer; };
+    jmrb* buffer; };
 
 
 void jmp_clear(struct jm_port* p) {
@@ -58,7 +77,7 @@ void jmp_clear(struct jm_port* p) {
             jack_port_unregister(j_client, p->port);
         
         if(p->buffer)
-            rb_free(p->buffer);
+            jmrb_free(p->buffer);
 
         p->port = 0;
         p->buffer = 0;
@@ -79,7 +98,7 @@ struct jm_port* jmp_create(unsigned long flags, size_t size) {
     if(jmp) {
         jmp->flags = flags;
         jmp->port = 0;
-        jmp->buffer = rb_create(size); }
+        jmp->buffer = jmrb_create(size); }
 
     return jmp; }
 
@@ -200,10 +219,10 @@ jack_client_t* jm_get_client() {
 
     t_audiosettings as;
     sys_get_audio_settings(&as);
-    if(as.a_callback)
+//    if(as.a_callback)
         jack_set_process_callback(j_client, jack_process_midi, NULL);
-    else
-        jack_set_process_callback(j_client, jack_has_events, NULL);
+//    else
+//        jack_set_process_callback(j_client, jack_has_events, NULL);
     
     int rc = jack_activate(j_client);
 //    fprintf(stderr, "jack_activate -> rc=%d\n", rc);
@@ -223,8 +242,10 @@ char const** jm_get_ports(enum JackPortFlags pf) {
 
 
 void jm_midi_in(int device, jack_midi_event_t* event) {
+    pthread_mutex_lock(&jm_mutex);
     for(size_t s=0; s < event->size; s++)
         sys_midibytein(device, event->buffer[s]);
+    pthread_mutex_unlock(&jm_mutex);
     return; }
 
 
@@ -245,13 +266,17 @@ char const* jm_print_event(
     size_t rsz = bsz - hsz - rbz;
     if(rsz < 2) // a bit messy, should copy in rb and check appropriately
         return buffer;
-    
+
     char* cursor = buffer + strlen(buffer);
-    size_t byte = 0;
-    while(byte < e->size && cursor < (buffer + bsz - rbz - 3)) {
-        sprintf(cursor, "%02x", e->buffer[byte]);
-        byte += 1;
-        cursor += 2; }
+    if(e->buffer != 0) {
+        size_t byte = 0;
+        while(byte < e->size && cursor < (buffer + bsz - rbz - 3)) {
+            sprintf(cursor, "%02x", e->buffer[byte]);
+            byte += 1;
+            cursor += 2;
+            continue;  }}
+    else
+        cursor += sprintf(cursor, "sz=%zd", e->size);
                                     
     if(cursor < buffer + bsz - rbz - 1)
         sprintf(cursor, "%s", rb);
@@ -315,6 +340,63 @@ void jm_set_last_event(jack_midi_event_t* e) {
     return; }
     
 
+struct jmr_header {
+    jack_nframes_t time;
+    size_t size; };
+
+typedef enum { false, true } bool;
+
+bool jmr_read(jmrb* rb, jack_midi_event_t* e) {
+    char eb[1024];
+    if(sizeof *e < jmrb_available_to_read(rb)) {
+        fprintf(stderr, "jmr_read: rb %p available=%d\n", rb, jmrb_available_to_read(rb)); fflush(stderr);
+        e->time = 0;
+        int rc = jmrb_read_from_buffer(rb, (void*)&e->time, sizeof e->time);
+        if(rc != 0) goto abort_read;
+
+        e->size = 0;
+        rc = jmrb_read_from_buffer(rb, (void*)&e->size, sizeof e->size);
+        if(rc != 0) goto abort_read;
+
+        e->buffer = 0;
+        fprintf(stderr, "%s\n", jm_print_event(eb, 1024, e, "|", ">")); fflush(stderr);
+        if(e->size < sizeof e->buffer) {
+            rc = jmrb_read_from_buffer(rb, (void*)&e->buffer, sizeof e->buffer);
+            if(rc != 0) goto abort_read; }
+        else {
+            e->buffer = alloca(e->size);
+            rc = jmrb_read_from_buffer(rb, (void*)&e->buffer, sizeof e->buffer);
+            if(rc != 0) goto abort_read; }
+
+        return true; }
+
+  abort_read:
+    jmrb_clear_buffer(rb);
+        
+    return false; }
+
+
+bool jmr_write(jmrb* rb, jack_midi_event_t* e) {
+    char eb[1024];
+    fprintf(stderr, "%s\n", jm_print_event(eb, 1023, e, "<", "|"));
+
+    size_t required = sizeof *e + e->size;
+    if(required >= jmrb_available_to_write(rb))
+        return false;
+
+    struct jmr_header h = { e->time, e->size };
+    int rc = jmrb_write_to_buffer(rb, 2,
+                                  &h, sizeof h,
+                                  e->buffer, e->size);
+    if(rc != 0)
+        fprintf(stderr, "failed to write\n");
+    else
+        fprintf(stderr, "jmr_read: rb %p available=%d\n", rb, jmrb_available_to_read(rb));
+    fflush(stderr);
+    
+    return rc == 0; }
+
+
 static uint64_t jpm_tick = 0;
 
 static int jack_has_events(jack_nframes_t n, void* j) {
@@ -346,6 +428,7 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0) {
+            fprintf(stderr, "jack_process_midi event count %s => %d\n", name, ic);
             pid_t tid = gettid();
             for(int e = 0; e < ic; e++) {
                 jack_midi_event_t event;
@@ -354,28 +437,11 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
                 if(r == 0) {
                     int is_same = jm_same_event(&jm_last_event, &event);
                     if(jm_sequence == 0 || !is_same) {
-                        char ebuf[1024];
-
-                        if(as.a_callback)
-                            jm_midi_in(i, &event);
-                        else {
-                            int avail = rb_available_to_write(jmp->buffer);
-                            if(avail > event.size) {
-                                // this may fix (or at least flag) the lossage that
-                                // happens while running in polling mode
-                                int ec = rb_write_to_buffer(jmp->buffer, 1, event.buffer, event.size);
-                                if(ec < 0) {
-                                    pd_error(0, "JACK MIDI: failed to write to ringbuffer");
-                                    break; }}
-                            else
-                                pd_error(0, "JACK MIDI: input ringbuffer overrun"); }
-                        
-                        jm_set_last_event(&event); }
-//                    else
-//                        fprintf(stderr, "is_same = %d\n", is_same)
-                    ; }
-                else
-                    fprintf(stderr, "whoopsie\n");
+                        bool ok = jmr_write(jmp->buffer, &event);
+                        if(!ok)
+                            pd_error(0, "JACK MIDI: %s failed to write to ringbuffer", name);
+                    
+                        jm_set_last_event(&event); }}
 
                 continue; }}
 
@@ -466,31 +532,21 @@ void jack_poll_midi(void)
     if(j_client == 0)
         return;
 
-#if defined(JACK_POLLING_IS_NOT_LOSING)
-    // this is called by the midi loop, sys_pollmidiqueue, for midi input.
-    // JACK kinda doesn't need it. But maybe we should have an implementation
-    // here to use when we are not in callbacks mode
-    t_audiosettings as;
-    sys_get_audio_settings(&as);
-    if(as.a_callback)
-        return;
+    for(size_t i=0; i < inports.using; i++) {
+        struct jm_port* jmp = inports.ports[i];
+        jack_port_t* port = jmp->port;
+        if(port == 0)
+            continue;
 
-    // need a ringbuffer per open port, methinks (ugh). Or an encoded byte stream (ick)
-    for(size_t i = 0; i < inports.using; i++) {
-        char buffer[4096];
-        struct jm_port* p = inports.ports[i];
-        
-         for(int ready = rb_available_to_read(p->buffer);
-            ready > 0;
-            ready = rb_available_to_read(p->buffer)) {
-            int read = ready < 4096 ?ready :4096;
-            rb_read_from_buffer(p->buffer, buffer, read);
-            for(int i=0; i<read; i++)
-                sys_midibytein(0, buffer[i]);
+        char const* name = jack_port_name(port);
+        jmrb* buffer = inports.ports[i]->buffer;
+        jack_midi_event_t event;
+        while(jmr_read(buffer, &event)) {
+            jm_midi_in(i, &event);
             continue; }
-
+        
         continue; }
-#endif
+    
     return;
 }
 
@@ -538,7 +594,8 @@ static void jack_midi_init() {
 
     jm_ports_init(&inports);
     jm_ports_init(&outports);
-    
+
+    pthread_mutex_init(&jm_mutex, 0);
     return; }
 
 
