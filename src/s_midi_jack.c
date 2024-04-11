@@ -34,7 +34,7 @@ int jmrb_available_to_write(jmrb* rb) { return jack_ringbuffer_write_space(rb); 
 void jmrb_clear_buffer(jmrb* rb) { jack_ringbuffer_reset(rb); } /* not thread safe w/JACK */
 void jmrb_free(jmrb* rb) { jack_ringbuffer_free(rb); }
 jmrb* jmrb_create(size_t size) { return jack_ringbuffer_create(size); }
-int jmrb_read_from_buffer(jmrb *rb, char *dest, int len) { return jack_ringbuffer_read(rb, dest, len); }
+int jmrb_read_from_buffer(jmrb *rb, char *dest, int len) { return jack_ringbuffer_read(rb, dest, len) < 0; }
 
 int jmrb_write_to_buffer(jmrb *rb, int n, ...) {
     va_list args;
@@ -247,10 +247,14 @@ char const** jm_get_ports(enum JackPortFlags pf) {
 
 
 void jm_midi_in(int device, jack_midi_event_t* event) {
-    pthread_mutex_lock(&jm_mutex);
+    char* buffer = event->buffer;
+    
+    if(event->size < sizeof event->buffer)
+        buffer = (char*)&event->buffer;
+    
     for(size_t s=0; s < event->size; s++)
-        sys_midibytein(device, event->buffer[s]);
-    pthread_mutex_unlock(&jm_mutex);
+        sys_midibytein(device, buffer[s]);
+    
     return; }
 
 
@@ -353,10 +357,11 @@ typedef enum { false, true } bool;
 
 bool jmr_read(jmrb* rb, jack_midi_event_t* e) {
     char eb[1024];
+    int rc = 0;
     if(sizeof *e < jmrb_available_to_read(rb)) {
         fprintf(stderr, "jmr_read: rb %p available=%d\n", rb, jmrb_available_to_read(rb)); fflush(stderr);
         e->time = 0;
-        int rc = jmrb_read_from_buffer(rb, (void*)&e->time, sizeof e->time);
+        rc = jmrb_read_from_buffer(rb, (void*)&e->time, sizeof e->time);
         if(rc != 0) goto abort_read;
 
         e->size = 0;
@@ -366,18 +371,20 @@ bool jmr_read(jmrb* rb, jack_midi_event_t* e) {
         e->buffer = 0;
         fprintf(stderr, "%s\n", jm_print_event(eb, 1024, e, "|", ">")); fflush(stderr);
         if(e->size < sizeof e->buffer) {
-            rc = jmrb_read_from_buffer(rb, (void*)&e->buffer, sizeof e->buffer);
+            rc = jmrb_read_from_buffer(rb, (void*)&e->buffer, e->size);
             if(rc != 0) goto abort_read; }
         else {
             e->buffer = alloca(e->size);
-            rc = jmrb_read_from_buffer(rb, (void*)&e->buffer, sizeof e->buffer);
+            rc = jmrb_read_from_buffer(rb, e->buffer, e->size);
             if(rc != 0) goto abort_read; }
 
         return true; }
 
+    return false;
+
   abort_read:
+    fprintf(stderr, "aborted read, rc=%d\n", rc);
     jmrb_clear_buffer(rb);
-        
     return false; }
 
 
@@ -389,9 +396,9 @@ bool jmr_write(jmrb* rb, jack_midi_event_t* e) {
     if(required >= jmrb_available_to_write(rb))
         return false;
 
-    struct jmr_header h = { e->time, e->size };
-    int rc = jmrb_write_to_buffer(rb, 2,
-                                  (const char*)&h, (int)(sizeof h),
+    int rc = jmrb_write_to_buffer(rb, 3,
+                                  (const char*)&e->time, (int)(sizeof e->time),
+                                  (const char*)&e->size, (int)(sizeof e->size),
                                   (const char*)e->buffer, (int)e->size);
     if(rc != 0)
         fprintf(stderr, "failed to write\n");
