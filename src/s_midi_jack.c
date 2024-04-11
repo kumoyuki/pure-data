@@ -28,17 +28,22 @@
 #include "jack/ringbuffer.h"
 
 /* abstracting the PD ringbuffer API */
-typedef struct jack_ringbuffer_t jmrb;
+typedef jack_ringbuffer_t jmrb;
 int jmrb_available_to_read(jmrb* rb) { return jack_ringbuffer_read_space(rb); }
 int jmrb_available_to_write(jmrb* rb) { return jack_ringbuffer_write_space(rb); }
 void jmrb_clear_buffer(jmrb* rb) { jack_ringbuffer_reset(rb); } /* not thread safe w/JACK */
 void jmrb_free(jmrb* rb) { jack_ringbuffer_free(rb); }
 jmrb* jmrb_create(size_t size) { return jack_ringbuffer_create(size); }
-int jmrb_read_from_buffer(jmrb *buffer, char *dest, int len) { return jack_ringbuffer_read(rb, dest, len); }
+int jmrb_read_from_buffer(jmrb *rb, char *dest, int len) { return jack_ringbuffer_read(rb, dest, len); }
 
-int jmrb_write_to_buffer(jmrb *buffer, int n, ...) {
-    va_args args;
+int jmrb_write_to_buffer(jmrb *rb, int n, ...) {
+    va_list args;
     va_start(args, n);
+    for(int i=0; i < n; i++) {
+        const char* buffer = va_arg(args, const char*);
+        int size = va_arg(args, int);
+        jack_ringbuffer_write(rb, buffer, size);
+        continue; }
     va_end(args);
     return 0; }
 
@@ -386,8 +391,8 @@ bool jmr_write(jmrb* rb, jack_midi_event_t* e) {
 
     struct jmr_header h = { e->time, e->size };
     int rc = jmrb_write_to_buffer(rb, 2,
-                                  &h, sizeof h,
-                                  e->buffer, e->size);
+                                  (const char*)&h, (int)(sizeof h),
+                                  (const char*)e->buffer, (int)e->size);
     if(rc != 0)
         fprintf(stderr, "failed to write\n");
     else

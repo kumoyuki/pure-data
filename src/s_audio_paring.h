@@ -1,5 +1,5 @@
-#ifndef _RINGBUFFER_H
-#define _RINGBUFFER_H
+#ifndef PA_RINGBUFFER_H
+#define PA_RINGBUFFER_H
 #ifdef __cplusplus
 extern "C"
 {
@@ -72,4 +72,4 @@ long sys_ringbuf_read(PA_VOLATILE sys_ringbuf *rbuf, void *data, long numBytes,
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /* _RINGBUFFER_H */
+#endif /* PA_RINGBUFFER_H */
