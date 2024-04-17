@@ -115,7 +115,7 @@ static int jack_polling_callback(jack_nframes_t nframes, void *unused)
         }
     }
 
-#if defined(USE_LOCAL_MIDI)
+#if !defined(USE_LOCAL_MIDI)
     if(jack_is_jack_midi())
         jackmidi_process(nframes, unused);
 #endif
