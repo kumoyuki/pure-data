@@ -448,7 +448,7 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
                 
                 int r = jack_midi_event_get (&event, pb, e);
                 if(r == 0) {
-                    int is_same = jm_same_event(&jm_last_event, &event);
+                    int is_same = 0; /* jm_same_event(&jm_last_event, &event); artifact of a bad init! */
                     if(jm_sequence == 0 || !is_same) {
                         bool ok = jmr_write(jmp->buffer, &event);
                         if(!ok)
