@@ -60,6 +60,7 @@ pthread_mutex_t jm_mutex;
 #define JACK_RINGBUFFER_SIZE 16384
 #define JACK_MIDI_CLIENT_NAME "pd-midi"
 
+static void jack_midi_init();
 static jack_client_t* j_client = 0;
 static jack_time_t j_last_time;
 
@@ -156,7 +157,6 @@ static void jmps_resize(struct jm_ports* ps, int nmidi) {
 
 static struct jm_ports* jm_resize_ports(unsigned long flags, int nmidi);
 static int jack_process_midi(jack_nframes_t n_frames, void* j);
-static int jack_has_events(jack_nframes_t n_frames, void* j);
 
 
 void jm_bind_ports(unsigned long flags, int nmidi, int* midivec, char const** names) {
@@ -224,10 +224,7 @@ jack_client_t* jm_get_client() {
 
     t_audiosettings as;
     sys_get_audio_settings(&as);
-//    if(as.a_callback)
-        jack_set_process_callback(j_client, jack_process_midi, NULL);
-//    else
-//        jack_set_process_callback(j_client, jack_has_events, NULL);
+    jack_set_process_callback(j_client, jack_process_midi, NULL);
     
     int rc = jack_activate(j_client);
 //    fprintf(stderr, "jack_activate -> rc=%d\n", rc);
@@ -291,6 +288,17 @@ char const* jm_print_event(
         sprintf(cursor, "%s", rb);
     
     return buffer; }
+
+
+char const* jmx_print_event(
+    char* buffer, size_t bsz, jack_midi_event_t* e,
+    char const* lb, char const* rb) {
+    jack_midi_event_t ex;
+    ex.time = e->time;
+    ex.size = e->size;
+    ex.buffer = e->size < sizeof e->buffer ?(char*)&e->buffer :(char*)e->buffer;
+
+    return jm_print_event(buffer, bsz, &ex, lb, rb); }
 
         
 struct jm_ports* jm_resize_ports(unsigned long flags, int nmidi) {
@@ -369,7 +377,6 @@ bool jmr_read(jmrb* rb, jack_midi_event_t* e) {
         if(rc != 0) goto abort_read;
 
         e->buffer = 0;
-        fprintf(stderr, "%s\n", jm_print_event(eb, 1024, e, "|", ">")); fflush(stderr);
         if(e->size < sizeof e->buffer) {
             rc = jmrb_read_from_buffer(rb, (void*)&e->buffer, e->size);
             if(rc != 0) goto abort_read; }
@@ -378,6 +385,7 @@ bool jmr_read(jmrb* rb, jack_midi_event_t* e) {
             rc = jmrb_read_from_buffer(rb, e->buffer, e->size);
             if(rc != 0) goto abort_read; }
 
+        fprintf(stderr, "%s\n", jmx_print_event(eb, 1024, e, "|", ">")); fflush(stderr);
         return true; }
 
     return false;
@@ -411,13 +419,6 @@ bool jmr_write(jmrb* rb, jack_midi_event_t* e) {
 
 static uint64_t jpm_tick = 0;
 
-static int jack_has_events(jack_nframes_t n, void* j) {
-    jpm_tick += 1;
-    while(atomic_load(&jm_is_polling));
-    atomic_store(&jm_pending_count, n);
-    return 0; }
-
-
 static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     // the void is user data, of which we have none
     jpm_tick += 1;
@@ -440,7 +441,7 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0) {
-            fprintf(stderr, "jack_process_midi event count %s => %d\n", name, ic);
+            fprintf(stderr, "jack_process_midi(%d/%lld) event count %s => %d\n", gettid(), jpm_tick, name, ic);
             pid_t tid = gettid();
             for(int e = 0; e < ic; e++) {
                 jack_midi_event_t event;
@@ -567,7 +568,7 @@ void jack_midi_getdevs(
 {
     int use_devs = 0;
 
-    j_client = jm_get_client();
+    jack_midi_init();
     if(j_client == 0)
         return;
     
@@ -602,12 +603,14 @@ void jack_midi_getdevs(
 
 static void jack_midi_init() {
     fprintf(stderr, "jack_midi_init\n");
-    j_client = 0;
-
-    jm_ports_init(&inports);
-    jm_ports_init(&outports);
-
-    pthread_mutex_init(&jm_mutex, 0);
+    if(j_client == 0) {
+        jm_ports_init(&inports);
+        jm_ports_init(&outports);
+ 
+        pthread_mutex_init(&jm_mutex, 0);
+        
+        j_client = jm_get_client(); }
+    
     return; }
 
 
@@ -617,7 +620,7 @@ static void jack_midi_save(int nmidiindev, int *midiindev, int nmidioutdev, int 
 
 
 void jackmidi_process(jack_nframes_t nf, void* j) {
-    jack_process_midi(nf, j);
+        /* jack_process_midi(nf, j); */
     return; }
 
 struct midi_plugin* jackmidi_get_plugin() {
