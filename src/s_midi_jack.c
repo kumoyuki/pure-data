@@ -411,7 +411,7 @@ bool jmr_write(jmrb* rb, jack_midi_event_t* e) {
     if(rc != 0)
         fprintf(stderr, "failed to write\n");
     else
-        fprintf(stderr, "jmr_read: rb %p available=%d\n", rb, jmrb_available_to_read(rb));
+        fprintf(stderr, "jmr_write: rb %p available=%d\n", rb, jmrb_available_to_read(rb));
     fflush(stderr);
     
     return rc == 0; }
@@ -441,7 +441,8 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0) {
-            fprintf(stderr, "jack_process_midi(%d/%lld) event count %s => %d\n", gettid(), jpm_tick, name, ic);
+            fprintf(stderr, "jack_process_midi(%d/%lld) event count %s => %d\n",
+                    gettid(), jpm_tick, name, ic);
             pid_t tid = gettid();
             for(int e = 0; e < ic; e++) {
                 jack_midi_event_t event;
@@ -454,7 +455,10 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
                         if(!ok)
                             pd_error(0, "JACK MIDI: %s failed to write to ringbuffer", name);
                     
-                        jm_set_last_event(&event); }}
+                        /* jm_set_last_event(&event); */ }}
+                else
+                    fprintf(stderr, "jack_process_midi(%d/%lld) jack_midi_event_get => %d\n",
+                            gettid(), jpm_tick, r);
 
                 continue; }}
 
@@ -555,6 +559,9 @@ void jack_poll_midi(void)
         jmrb* buffer = inports.ports[i]->buffer;
         jack_midi_event_t event;
         while(jmr_read(buffer, &event)) {
+            char buffer[64];
+            jmx_print_event(buffer, 64, &event, "|", ">");
+            fprintf(stderr, "jack_poll_midi: %s\n", buffer);
             jm_midi_in(i, &event);
             continue; }
         

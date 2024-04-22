@@ -177,7 +177,9 @@ static void notein_setup(void)
 
 void inmidi_noteon(int portno, int channel, int pitch, int velo)
 {
-//    fprintf(stderr, "inmidi_noteon<%d>: sequence = %lld\n", gettid(), ++inmidi_sequence);
+    fprintf(stderr, "inmidi_noteon<%d>: sequence = %lld [%d %d %d %d]\n",
+            gettid(), ++inmidi_sequence,
+            portno, channel, pitch, velo);
     if (pd_this->pd_midi->m_notein_sym->s_thing)
     {
         t_atom at[3];
