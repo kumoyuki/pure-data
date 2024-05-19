@@ -366,8 +366,11 @@ typedef enum { false, true } bool;
 bool jmr_read(jmrb* rb, jack_midi_event_t* e) {
     char eb[1024];
     int rc = 0;
-    if(sizeof *e < jmrb_available_to_read(rb)) {
-        fprintf(stderr, "jmr_read: rb %p available=%d\n", rb, jmrb_available_to_read(rb)); fflush(stderr);
+    size_t available = jmrb_available_to_read(rb);
+    if(available > -0) {
+        /* the atomic write ensures that we will always have at least one full MIDI
+         * message in the pipeline
+         */
         e->time = 0;
         rc = jmrb_read_from_buffer(rb, (void*)&e->time, sizeof e->time);
         if(rc != 0) goto abort_read;
@@ -405,14 +408,11 @@ bool jmr_write(jmrb* rb, jack_midi_event_t* e) {
         return false;
 
     int rc = jmrb_write_to_buffer(rb, 3,
-                                  (const char*)&e->time, (int)(sizeof e->time),
-                                  (const char*)&e->size, (int)(sizeof e->size),
-                                  (const char*)e->buffer, (int)e->size);
+                                  (const char*)&e->time, (uint32_t)(sizeof e->time),
+                                  (const char*)&e->size, sizeof e->size,
+                                  (const char*)e->buffer, e->size);
     if(rc != 0)
-        fprintf(stderr, "failed to write\n");
-    else
-        fprintf(stderr, "jmr_write: rb %p available=%d\n", rb, jmrb_available_to_read(rb));
-    fflush(stderr);
+        fprintf(stderr, "jmr_write: failed to write: %p\n", rb);
     
     return rc == 0; }
 
@@ -441,8 +441,6 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
         jack_nframes_t ic = jack_midi_get_event_count(pb);
         if(ic > 0) {
-            fprintf(stderr, "jack_process_midi(%d/%lld) event count %s => %d\n",
-                    gettid(), jpm_tick, name, ic);
             pid_t tid = gettid();
             for(int e = 0; e < ic; e++) {
                 jack_midi_event_t event;
