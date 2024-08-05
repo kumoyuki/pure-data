@@ -609,6 +609,10 @@ static void jack_midi_init() {
 
 static void jack_midi_save(int nmidiindev, int *midiindev, int nmidioutdev, int *midioutdev)
 {
+        /* it turns out that the default system save behavior
+         * is pretty much all that is needed. nothing to see 
+         * here. Move along to s_file.c; search for midi
+         */
 }
 
 
