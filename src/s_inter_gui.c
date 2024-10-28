@@ -152,6 +152,7 @@ static void print_val(t_val v) {
         dprintf(2, "(message)%s %d@%p", v.string, v.size, v.value.p);
         break;
     default:
+        dprintf(2, "default");
         break;
     }
     dprintf(2, "\n");
