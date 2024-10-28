@@ -412,6 +412,7 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
     t_audiosettings as;
     sys_get_audio_settings(&as);
 
+    // data from JACK -> ringbuffer
     for(size_t i=0; i < inports.using; i++) {
         struct jm_port* jmp = inports.ports[i];
         jack_port_t* port = jmp->port;
@@ -446,6 +447,20 @@ static int jack_process_midi(jack_nframes_t n_frames, void* j) {
 
                 continue; }}
 
+        continue; }
+
+    // data from ring buffer -> JACK
+    for(size_t i=0; i < outports.using; i++) {
+        struct jm_port* jmp = outports.ports[i];
+        jack_port_t* port = jmp->port;
+        if(port == 0)
+            continue;
+        
+        char const* name = jack_port_name(port);
+        if(name == 0) {
+            fprintf(stderr, "failed to get port name for %zd, %p\n", i, port);
+            continue; }
+        
         continue; }
     
     return 0; }
@@ -517,6 +532,12 @@ void jack_putmidimess(int portno, int a, int b, int c)
     jack_midi_event_write(pb, nf, e, 3);
 
     jack_cycle_signal(j_client, 0);
+#else
+        // jmr_write() the output ringbuffer for the channel used
+        // in jack_process_midi()
+        //
+        // it is not clear if there should be a separate queueing stage
+        // into jack_poll_midi
 #endif
     return;
 }
