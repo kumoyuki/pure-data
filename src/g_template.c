@@ -49,7 +49,7 @@ struct _pdstruct
 
 struct _instancetemplate
 {
-    int curve_motion_field;
+    int curve_motion_vertex;
     t_float curve_motion_xcumulative;
     t_float curve_motion_xbase;
     t_float curve_motion_xper;
@@ -1125,7 +1125,7 @@ typedef struct _curve
     t_fielddesc x_width;
     t_fielddesc x_vis;
     int x_npoints;
-    t_fielddesc *x_vec;
+    t_fielddesc *x_vec; /* the vertices, as fields, in pairs */
     t_canvas *x_canvas;
 } t_curve;
 
@@ -1405,13 +1405,13 @@ static void curve_motionfn(void *z, t_floatarg dx, t_floatarg dy, t_floatarg up)
         post("curve_motion: scalar disappeared");
         return;
     }
-    if (THISTMPL->curve_motion_field < 0)   /* drag the whole object */
+    if (THISTMPL->curve_motion_vertex < 0)   /* drag the whole object */
     {
         gobj_displace(&THISTMPL->curve_motion_scalar->sc_gobj,
             THISTMPL->curve_motion_glist, dx, dy);
         return;
     }
-    f = x->x_vec + THISTMPL->curve_motion_field;
+    f = x->x_vec + THISTMPL->curve_motion_vertex;
     THISTMPL->curve_motion_xcumulative += dx;
     THISTMPL->curve_motion_ycumulative += dy;
     if (f->fd_var && (dx != 0))
@@ -1463,10 +1463,14 @@ static int curve_click(t_gobj *z, t_glist *glist,
     int bestn = -1;
     int besterror = 0x7fffffff;
     t_fielddesc *f;
-    if ((x->x_flags & NOMOUSERUN) || (x->x_flags & NOVERTICES) ||
+    int x1, y1, x2, y2;
+    curve_getrect(z, glist, data, template, basex, basey,
+        &x1, &y1, &x2, &y2);
+    if ((x->x_flags & NOMOUSERUN)  ||
         !fielddesc_getfloat(&x->x_vis, template, data, 0))
             return (0);
-    for (i = 0, f = x->x_vec; i < n; i++, f += 2)
+    if (!(x->x_flags & NOVERTICES))
+        for (i = 0, f = x->x_vec; i < n; i++, f += 2)
     {
         int xval = fielddesc_getcoord(f, template, data, 0),
             xloc = glist_xtopixels(glist, basex + xval);
@@ -1491,15 +1495,19 @@ static int curve_click(t_gobj *z, t_glist *glist,
     }
     if (besterror > 6)  /* no hot points got hit */
     {
-        if (x->x_flags & DRAGGABLE) /* can we drag the whole scalar? */
-        {
-            int x1, y1, x2, y2;
-            curve_getrect(z, glist, data, template, basex, basey,
-                &x1, &y1, &x2, &y2);
-            if (xpix < x1 || xpix > x2 || ypix < y1 || ypix > y2)
-                 return (0);
-        }
-        else return (0);
+            /* if we're in the bounding rect and the draggable flag
+            is set we can drag the whole object; othrwise we don't
+            do anything.  But we still return -1 if we're in the rectangle
+            so that the struct object can notify the patch of the click.
+            The "-1" tells scalar_doclick() to call template_notifyforscalar()
+            but scalar_click() then returns 0 so that the search for a click
+            will continue.  This way, all polygons that got clicked on will
+            get notified up to and until someone gets bonked on a hot point,
+            at which point the search stops. */
+        if (xpix < x1 || xpix > x2 || ypix < y1 || ypix > y2)
+            return (0);
+        if (!(x->x_flags & DRAGGABLE))
+            return (-1);
     }
     if (doit)
     {
@@ -1513,7 +1521,9 @@ static int curve_click(t_gobj *z, t_glist *glist,
         THISTMPL->curve_motion_scalar = sc;
         THISTMPL->curve_motion_array = ap;
         THISTMPL->curve_motion_wp = data;
-        THISTMPL->curve_motion_field = (besterror <= 6 ? 2*bestn : -1);
+            /* if we missed all hot points we're dragging the whole thing;
+            otherwise note the vertex to drag on. */
+        THISTMPL->curve_motion_vertex = (besterror <= 6 ? 2*bestn : -1);
         THISTMPL->curve_motion_template = template;
         if (THISTMPL->curve_motion_scalar)
             gpointer_setglist(&THISTMPL->curve_motion_gpointer,
@@ -2395,7 +2405,7 @@ static int array_doclick_element(t_array *array, t_glist *glist,
             (t_word *)((char *)(array->a_vec) + i * elemsize),
             elemtemplate, 0, array,
             glist, usexloc, useyloc,
-            xpix, ypix, shift, alt, dbl, doit)))
+            xpix, ypix, shift, alt, dbl, doit)) > 0)
                 return (hit);
     }
     return (0);
@@ -2900,6 +2910,8 @@ static void drawtext_activate(t_gobj *z, t_glist *glist,
     post("drawtext_activate %d", state);
 }
 
+void rtext_setcolor(t_rtext *x, int color);
+
 static void drawtext_vis(t_gobj *z, t_glist *glist,
     t_word *data, t_template *template, t_scalar *sc,
     t_float basex, t_float basey, int vis)
@@ -2941,6 +2953,7 @@ static void drawtext_vis(t_gobj *z, t_glist *glist,
                 "-font", 3, fontatoms,
                 "-tags", 2, tags);
             /* draw text */
+        rtext_setcolor(rtext, color);
         drawtext_gettext(z, data, &textbuf, &textlen);
         rtext_retextforscalar(rtext, textbuf, textlen,
             xloc + glist_fontwidth(glist) * strlen(x->x_label->s_name), yloc);

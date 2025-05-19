@@ -64,9 +64,6 @@ int canvas_setdeleting(t_canvas *x, int flag)
     return (ret);
 }
 
-    /* JMZ: emit a closebang message */
-void rtext_freefortext(t_glist *gl, t_text *who);
-
     /* delete an object from a glist and free it */
 void glist_delete(t_glist *x, t_gobj *y)
 {
@@ -124,12 +121,9 @@ void glist_delete(t_glist *x, t_gobj *y)
         canvas_redrawdataforthis(x, 2);
     gobj_delete(y, x);
     if (glist_isvisible(canvas))
-    {
         gobj_vis(y, x, 0);
-    }
-    if (x->gl_editor && (ob = pd_checkobject(&y->g_pd)) &&
-        !(rtext = glist_getrtext(x, ob)))
-            rtext = glist_getrtext(x, ob);
+    if (glist_getcanvas(x)->gl_editor && (ob = pd_checkobject(&y->g_pd)))
+        rtext = glist_getrtext(x, ob);
     if (x->gl_list == y) x->gl_list = y->g_next;
     else for (g = x->gl_list; g; g = g->g_next)
         if (g->g_next == y)
@@ -1006,11 +1000,13 @@ static void graph_select(t_gobj *z, t_glist *glist, int state)
         sprintf(tag, "%sR",  rtext_gettag(y));
         pdgui_vmess(0, "crs rr",
                   glist, "itemconfigure", tag,
-                  "-fill", (state? "blue" : "black"));
+                  "-fill", (state? THISGUI->i_selectcolor->s_name :
+                      THISGUI->i_foregroundcolor->s_name));
         sprintf(tag, "graph%lx", (t_int)z);
         pdgui_vmess(0, "crs rr",
                   glist_getcanvas(glist), "itemconfigure", tag,
-                  "-fill", (state? "blue" : "black"));
+                  "-fill", (state? THISGUI->i_selectcolor->s_name :
+                      THISGUI->i_foregroundcolor->s_name));
     }
 }
 
@@ -1094,7 +1090,7 @@ static int graph_click(t_gobj *z, struct _glist *glist,
         {
             int x1, y1, x2, y2;
                 /* check if the object wants to be clicked */
-            if (canvas_hitbox(x, y, xpix, ypix, &x1, &y1, &x2, &y2)
+            if (canvas_hitbox(x, y, xpix, ypix, &x1, &y1, &x2, &y2, 0)
                 &&  (clickreturned = gobj_click(y, x, xpix, ypix,
                     shift, alt, dbl, doit)))
                         break;
